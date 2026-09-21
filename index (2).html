@@ -1,0 +1,1500 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vérification PROOPE011 — Ambulance Chicoutimi</title>
+<meta name="description" content="Outil du TAP pour vérifier le droit à une période de non-disponibilité selon la procédure PROOPE011 (art. 4.4 / 4.5), avec historique des constats.">
+
+<!-- PWA : installation sur écran d'accueil -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b3d78">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PROOPE011">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    /* Blanc / bleu institutionnel Ambulance Chicoutimi */
+    --bg: #eef2f7;
+    --surface: #ffffff;
+    --surface-sunken: #f2f5fa;
+    --border: #d6dee9;
+    --text: #142235;
+    --text-dim: #5b6a80;
+    --accent: #0b3d78;
+    --accent-2: #1560ad;
+    --accent-ink: #ffffff;
+    --ok-bg: #e3f3ea;
+    --ok-fg: #1f6e4a;
+    --ok-line: #2e7d5b;
+    --watch-bg: #fbf1da;
+    --watch-fg: #8a6412;
+    --watch-line: #b8860b;
+    --soon-bg: #fbe7da;
+    --soon-fg: #9c4a18;
+    --soon-line: #c1622a;
+    --crit-bg: #f9e1e1;
+    --crit-fg: #932c2c;
+    --crit-line: #b23a3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1420;
+      --surface: #16202f;
+      --surface-sunken: #121a27;
+      --border: #263449;
+      --text: #e7edf5;
+      --text-dim: #91a1b8;
+      --accent: #6ea2e0;
+      --accent-2: #8fb8ea;
+      --accent-ink: #0b1a2c;
+      --ok-bg: #16302290;
+      --ok-fg: #7fd1a7;
+      --ok-line: #3f9b6e;
+      --watch-bg: #3a2f0f90;
+      --watch-fg: #e5c26b;
+      --watch-line: #cf9d2f;
+      --soon-bg: #3a230f90;
+      --soon-fg: #eda06c;
+      --soon-line: #d97a3c;
+      --crit-bg: #3a141490;
+      --crit-fg: #f29a9a;
+      --crit-line: #d15757;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1420;
+    --surface: #16202f;
+    --surface-sunken: #121a27;
+    --border: #263449;
+    --text: #e7edf5;
+    --text-dim: #91a1b8;
+    --accent: #6ea2e0;
+    --accent-2: #8fb8ea;
+    --accent-ink: #0b1a2c;
+    --ok-bg: #16302290;
+    --ok-fg: #7fd1a7;
+    --ok-line: #3f9b6e;
+    --watch-bg: #3a2f0f90;
+    --watch-fg: #e5c26b;
+    --watch-line: #cf9d2f;
+    --soon-bg: #3a230f90;
+    --soon-fg: #eda06c;
+    --soon-line: #d97a3c;
+    --crit-bg: #3a141490;
+    --crit-fg: #f29a9a;
+    --crit-line: #d15757;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .brandbar {
+    background: var(--accent);
+    color: #fff;
+    border-bottom: 3px solid var(--accent-2);
+    padding: 13px 16px;
+    padding-top: max(13px, env(safe-area-inset-top));
+  }
+  .brandbar .brandrow {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .brandbar .brandtext {
+    font-family: "Source Serif 4", "IBM Plex Sans", serif;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    font-size: 17px;
+  }
+  .brandbar .brandsub {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  .wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 0 16px 64px;
+  }
+  header.page {
+    padding: 22px 4px 14px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-family: "Source Serif 4", "IBM Plex Sans", serif;
+    font-size: 23px;
+    line-height: 1.3;
+    margin: 5px 0 6px;
+    text-wrap: balance;
+    font-weight: 600;
+  }
+  .sub {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    max-width: 60ch;
+  }
+
+  /* ---- bandeau d'installation (PWA) ---- */
+  .install-banner {
+    display: none;
+    background: var(--accent-2);
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .install-banner.show { display: block; }
+  .install-banner-inner {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .install-banner button {
+    background: #fff;
+    color: var(--accent);
+    border: none;
+    border-radius: 3px;
+    padding: 7px 12px;
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .install-banner .dismiss {
+    background: transparent;
+    color: #fff;
+    text-decoration: underline;
+    font-weight: 500;
+  }
+
+  /* ---- onglets ---- */
+  .tabbar {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .tabbar-inner {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    padding: 0 16px;
+  }
+  .tab-btn {
+    flex: none;
+    padding: 13px 6px 11px;
+    margin-right: 22px;
+    background: none;
+    border: none;
+    border-bottom: 2.5px solid transparent;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-dim);
+  }
+  .tab-btn.active .tab-count { color: var(--accent); border-color: var(--accent); }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---- sticky result banner ---- */
+  .result {
+    position: sticky;
+    top: 42px;
+    z-index: 20;
+    margin: 0 -16px 18px;
+    padding: 14px 16px;
+    background: var(--surface-sunken);
+    border-bottom: 1px solid var(--border);
+    transition: background-color .25s ease, border-color .25s ease;
+  }
+  .result-inner {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .result-cumul {
+    flex: none;
+    text-align: center;
+    padding: 2px 16px 2px 2px;
+    border-right: 1px solid var(--border);
+    min-width: 84px;
+  }
+  .result-cumul-value {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+  }
+  .result-cumul-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: 3px;
+  }
+  .result.ok    .result-cumul-value { color: var(--ok-fg); }
+  .result.watch .result-cumul-value { color: var(--watch-fg); }
+  .result.soon  .result-cumul-value { color: var(--soon-fg); }
+  .result.crit  .result-cumul-value { color: var(--crit-fg); }
+  .result-dot {
+    display: inline-block;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim);
+    flex: none;
+    margin-right: 6px;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-dim) 18%, transparent);
+  }
+  .result-text { flex: 1; min-width: 0; }
+  .result-label {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .result-msg {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .result-detail {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+  .result.ok    { background: var(--ok-bg); }
+  .result.watch { background: var(--watch-bg); }
+  .result.soon  { background: var(--soon-bg); }
+  .result.crit  { background: var(--crit-bg); }
+  .result.ok    .result-dot { background: var(--ok-line);    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok-line) 22%, transparent); }
+  .result.watch .result-dot { background: var(--watch-line); box-shadow: 0 0 0 3px color-mix(in srgb, var(--watch-line) 22%, transparent); }
+  .result.soon  .result-dot { background: var(--soon-line);  box-shadow: 0 0 0 3px color-mix(in srgb, var(--soon-line) 22%, transparent); }
+  .result.crit  .result-dot { background: var(--crit-line);  box-shadow: 0 0 0 3px color-mix(in srgb, var(--crit-line) 22%, transparent); }
+  .result.ok    .result-label, .result.ok    .result-msg { color: var(--ok-fg); }
+  .result.watch .result-label, .result.watch .result-msg { color: var(--watch-fg); }
+  .result.soon  .result-label, .result.soon  .result-msg { color: var(--soon-fg); }
+  .result.crit  .result-label, .result.crit  .result-msg { color: var(--crit-fg); }
+
+  /* ---- cards ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .card h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0;
+  }
+  .card-action {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 2px 0;
+    white-space: nowrap;
+  }
+  .card-action:hover { text-decoration: underline; }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  input[type="text"], input[type="time"], input[type="date"] {
+    width: 100%;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    padding: 9px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--surface-sunken);
+    color: var(--text);
+  }
+  .dt-pair {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 6px;
+  }
+  .dt-pair input[type="date"] { color: var(--text-dim); font-size: 12.5px; }
+  input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* activity log */
+  .activity {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: var(--surface-sunken);
+    position: relative;
+  }
+  .activity-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .activity-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+  .activity-calc {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    text-align: right;
+    line-height: 1.5;
+  }
+  .activity-calc b { color: var(--text); font-weight: 700; }
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 6px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .remove-btn:hover { color: var(--crit-fg); }
+
+  .empty-hint {
+    font-size: 13px;
+    color: var(--text-dim);
+    padding: 14px 2px;
+    text-align: center;
+    border: 1.5px dashed var(--border);
+    border-radius: 3px;
+    margin-bottom: 10px;
+  }
+
+  .add-btn {
+    width: 100%;
+    padding: 11px;
+    border-radius: 3px;
+    border: 1.5px dashed var(--border);
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .add-btn:hover { background: var(--surface-sunken); }
+
+  .email-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 3px;
+    border: none;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font: inherit;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .email-btn:hover { background: var(--accent-2); }
+  .email-btn.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1.5px solid var(--border);
+  }
+  .email-btn.secondary:hover { background: var(--surface-sunken); }
+  .email-btn.small {
+    padding: 7px 11px;
+    font-size: 12px;
+  }
+  .email-btn.danger { color: var(--crit-fg); border-color: var(--crit-line); }
+  .email-btn.danger:hover { background: var(--crit-bg); }
+  .email-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .email-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .email-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .email-preview {
+    margin: 12px 0 0;
+    padding: 12px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow-y: auto;
+    -webkit-user-select: all;
+    user-select: all;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  }
+  .legend .i-ok { background: var(--ok-line); }
+  .legend .i-watch { background: var(--watch-line); }
+  .legend .i-soon { background: var(--soon-line); }
+  .legend .i-crit { background: var(--crit-line); }
+
+  footer {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    padding: 8px 4px max(8px, env(safe-area-inset-bottom));
+  }
+  .example-flag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 7px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .save-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0;
+    transition: opacity .3s ease;
+  }
+  .save-flag.show { opacity: 1; }
+  .save-flag i {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok-line);
+    display: inline-block;
+  }
+
+  /* ---- historique ---- */
+  .hist-entry {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 10px;
+    background: var(--surface-sunken);
+    overflow: hidden;
+  }
+  .hist-entry-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    cursor: pointer;
+  }
+  .hist-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    flex: none;
+    background: var(--text-dim);
+  }
+  .hist-dot.ok { background: var(--ok-line); }
+  .hist-dot.watch { background: var(--watch-line); }
+  .hist-dot.soon { background: var(--soon-line); }
+  .hist-dot.crit { background: var(--crit-line); }
+  .hist-main { flex: 1; min-width: 0; }
+  .hist-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .hist-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+  .hist-chevron {
+    color: var(--text-dim);
+    font-size: 12px;
+    flex: none;
+    transition: transform .2s ease;
+  }
+  .hist-entry.open .hist-chevron { transform: rotate(90deg); }
+  .hist-body {
+    display: none;
+    padding: 0 12px 12px;
+    border-top: 1px solid var(--border);
+  }
+  .hist-entry.open .hist-body { display: block; }
+  .hist-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 10px 0;
+  }
+  .hist-detail-table th {
+    text-align: left;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-dim);
+    font-weight: 700;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hist-detail-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .hist-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="brandbar">
+  <div class="brandrow">
+    <div class="brandtext">Ambulance Chicoutimi SLN</div>
+    <div class="brandsub">PROOPE011</div>
+  </div>
+</div>
+
+<div class="install-banner" id="installBanner">
+  <div class="install-banner-inner">
+    <span id="installBannerText">Installez cet outil sur votre écran d'accueil pour l'ouvrir comme une application, même hors ligne.</span>
+    <span class="email-actions">
+      <button id="installBtn" type="button">Installer</button>
+      <button class="dismiss" id="installDismiss" type="button">Non merci</button>
+    </span>
+  </div>
+</div>
+
+<div class="tabbar">
+  <div class="tabbar-inner">
+    <button class="tab-btn active" id="tabBtnCurrent" type="button" data-tab="current">Quart actuel</button>
+    <button class="tab-btn" id="tabBtnHistory" type="button" data-tab="history">Historique <span class="tab-count" id="histCount">0</span></button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ===================== VUE : QUART ACTUEL ===================== -->
+  <div class="view active" id="viewCurrent">
+
+    <div id="result" class="result">
+      <div class="result-inner">
+        <div class="result-cumul">
+          <div class="result-cumul-value" id="resultCumulValue">—</div>
+          <div class="result-cumul-label">cumul continu</div>
+        </div>
+        <div class="result-text">
+          <div class="result-label"><span class="result-dot" id="resultDot"></span><span id="resultLabel">Statut</span></div>
+          <div class="result-msg" id="resultMsg">Entrez vos activités ci-dessous</div>
+          <div class="result-detail" id="resultDetail"></div>
+        </div>
+      </div>
+    </div>
+
+    <header class="page">
+      <div class="eyebrow">PROOPE011 · Outil du TAP</div>
+      <h1>Ai-je droit à une période de non-disponibilité&nbsp;?</h1>
+      <p class="sub">Entrez vos activités depuis le début de votre période de faction — mêmes colonnes que le formulaire papier. L'outil calcule votre temps de travail continu et votre repos, et vous dit si vous vous qualifiez à la règle du 16&nbsp;h ou du 24&nbsp;h (art. 4.4 / 4.5).</p>
+    </header>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Votre quart</h2>
+        <span style="display:flex; align-items:center; gap:12px;">
+          <span class="save-flag" id="saveFlag"><i></i>Enregistré sur cet appareil</span>
+          <button class="card-action" id="newShiftBtn" type="button">Nouveau quart</button>
+        </span>
+      </div>
+      <div class="field-row">
+        <div>
+          <label for="unitId">Numéro d'équipe / véhicule</label>
+          <input type="text" id="unitId" placeholder="ex. 3627 PDC">
+        </div>
+        <div>
+          <label for="sector">Secteur</label>
+          <input type="text" id="sector" placeholder="ex. FACTION SLNNDQ">
+        </div>
+      </div>
+      <div class="field-row" style="grid-template-columns: 1fr 1fr;">
+        <div>
+          <label for="factionStartDate">Début de la période de faction</label>
+          <div class="dt-pair">
+            <input type="date" id="factionStartDate">
+            <input type="time" id="factionStart" value="08:00">
+          </div>
+        </div>
+        <div>
+          <label for="nowTimeDate">Maintenant</label>
+          <div class="dt-pair">
+            <input type="date" id="nowTimeDate">
+            <input type="time" id="nowTime">
+          </div>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:2px;">Si votre période de faction a commencé hier (ou avant), changez simplement la date de début — l'outil calcule correctement même sur plusieurs jours. Vos données restent enregistrées sur cet appareil même si vous fermez l'application.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Journal de vos activités <span class="example-flag" id="exampleFlag">exemple pré-rempli</span></h2>
+      </div>
+      <div id="activityList"></div>
+      <button class="add-btn" id="addActivity" type="button">+ Ajouter une activité</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:10px;">Transmettre ce constat</h2>
+      <div class="email-row">
+        <p class="email-hint">Envoie le rapport complet (détail de chaque activité inclus) par courriel au superviseur de garde, l'archive dans l'historique, ou copie-le pour le coller ailleurs (SMS, radio, etc.).</p>
+        <div class="email-actions">
+          <a href="#" id="sendEmailBtn" class="email-btn">Envoyer le rapport complet</a>
+          <button type="button" id="archiveBtn" class="email-btn secondary">Archiver dans l'historique</button>
+          <button type="button" id="copyEmailBtn" class="email-btn secondary">Copier</button>
+        </div>
+      </div>
+      <pre id="emailPreview" class="email-preview"></pre>
+    </div>
+
+    <div class="card">
+      <div class="legend">
+        <span><i class="i-ok"></i>OK — sous les seuils</span>
+        <span><i class="i-watch"></i>Approche du seuil — à surveiller</span>
+        <span><i class="i-soon"></i>Admissible à une non-disponibilité</span>
+        <span><i class="i-crit"></i>Seuil atteint — non-disponibilité obligatoire</span>
+      </div>
+    </div>
+
+    <footer>
+      Basé sur les articles 4.4 et 4.5 de la procédure PROOPE011 (identique à PRO-3001 CSAQ). Cet outil est une aide au calcul, pas une décision finale — si vous vous qualifiez, contactez le superviseur de garde en gardant en main votre secteur, votre numéro d'équipe et l'heure de début de non-disponibilité désirée (art. 4.2), et demeurez disponible jusqu'à la confirmation téléphonique (art. 4.3).
+    </footer>
+
+  </div>
+
+  <!-- ===================== VUE : HISTORIQUE ===================== -->
+  <div class="view" id="viewHistory">
+
+    <header class="page">
+      <div class="eyebrow">PROOPE011 · Historique</div>
+      <h1>Constats archivés sur cet appareil</h1>
+      <p class="sub">Chaque fois que vous archivez un constat (ou débutez un nouveau quart), il est conservé ici — même hors ligne. L'historique reste sur cet appareil; il n'est pas partagé automatiquement avec les autres TAP.</p>
+    </header>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Constats enregistrés</h2>
+        <button class="card-action" id="clearHistoryBtn" type="button" style="color:var(--crit-fg);">Tout effacer</button>
+      </div>
+      <div id="historyList"></div>
+      <div class="empty-hint" id="historyEmptyHint">Aucun constat archivé pour l'instant. Utilisez « Archiver dans l'historique » ou « Nouveau quart » depuis l'onglet Quart actuel.</div>
+    </div>
+
+    <footer>
+      L'historique est stocké localement dans ce navigateur/cette application, sur cet appareil seulement. Pour le conserver ailleurs, envoyez chaque constat par courriel au moment de l'archiver.
+    </footer>
+
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_STATE = "proope011_state_v1";
+  var STORAGE_HISTORY = "proope011_history_v1";
+  var STORAGE_SEEDED = "proope011_seeded_v1";
+
+  // ---------- stockage local (par appareil) ----------
+  function loadJSON(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+  function saveJSON(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+    catch (e) { return false; }
+  }
+
+  var listEl = document.getElementById("activityList");
+  var addBtn = document.getElementById("addActivity");
+  var saveFlag = document.getElementById("saveFlag");
+  var exampleFlag = document.getElementById("exampleFlag");
+
+  // Chaque activité a sa propre date+heure par champ, pour couvrir une faction
+  // qui s'étend sur plusieurs jours (ex. commencée hier, ou un appel qui chevauche minuit).
+  var activities = [];
+  var isExampleData = false;
+
+  function isoDate(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function isoTime(d) {
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+
+  function newActivity(startDate, start, callEndDate, callEnd, activityEndDate, activityEnd) {
+    return {
+      startDate: startDate || "", start: start || "",
+      callEndDate: callEndDate || "", callEnd: callEnd || "",
+      activityEndDate: activityEndDate || "", activityEnd: activityEnd || ""
+    };
+  }
+
+  function exampleActivities() {
+    var today = new Date();
+    var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+    var tISO = isoDate(today), yISO = isoDate(yesterday);
+    return {
+      factionStartDate: yISO,
+      factionStart: "08:00",
+      activities: [
+        newActivity(yISO, "08:00", "", "", yISO, "08:15"),
+        newActivity(yISO, "09:00", yISO, "11:00", yISO, "11:30"),
+        newActivity(yISO, "22:00", tISO, "00:20", tISO, "00:45")
+      ]
+    };
+  }
+
+  function blankState() {
+    return { unitId: "", sector: "", factionStartDate: "", factionStart: "08:00", activities: [] };
+  }
+
+  // ---------- chargement initial : reprend le dernier quart en cours sur cet
+  // appareil, ou montre un exemple pré-rempli une seule fois au tout premier
+  // lancement (jamais confondu avec de vraies données : badge "exemple") ----------
+  function loadInitialState() {
+    var saved = loadJSON(STORAGE_STATE, null);
+    if (saved && (saved.activities || []).length) {
+      isExampleData = false;
+      return saved;
+    }
+    var seeded = loadJSON(STORAGE_SEEDED, false);
+    if (!seeded) {
+      saveJSON(STORAGE_SEEDED, true);
+      isExampleData = true;
+      var ex = exampleActivities();
+      return { unitId: "3627 PDC", sector: "FACTION SLNNDQ", factionStartDate: ex.factionStartDate, factionStart: ex.factionStart, activities: ex.activities };
+    }
+    isExampleData = false;
+    return blankState();
+  }
+
+  var initial = loadInitialState();
+  activities = initial.activities.slice();
+
+  function toDate(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return null;
+    var d = new Date(dateStr + "T" + timeStr + ":00");
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function fmtHM(totalMinutes) {
+    if (totalMinutes === null || isNaN(totalMinutes)) return "—";
+    var h = Math.floor(totalMinutes / 60);
+    var m = Math.round(totalMinutes % 60);
+    return h + "h" + (m < 10 ? "0" : "") + m;
+  }
+
+  function fmtDateFR(iso) {
+    if (!iso) return "?";
+    var parts = iso.split("-");
+    if (parts.length !== 3) return iso;
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  // Différence en minutes entre deux Date réels (jamais négative — une valeur négative
+  // signale une saisie incohérente, ex. fin avant début, plutôt que d'être masquée).
+  function diffMinutes(fromDate, toDateVal) {
+    if (!fromDate || !toDateVal) return null;
+    return Math.round((toDateVal - fromDate) / 60000);
+  }
+
+  var saveFlagTimer = null;
+  function flashSaved() {
+    saveFlag.classList.add("show");
+    clearTimeout(saveFlagTimer);
+    saveFlagTimer = setTimeout(function () { saveFlag.classList.remove("show"); }, 1600);
+  }
+
+  function persistCurrentState() {
+    var state = {
+      unitId: document.getElementById("unitId").value,
+      sector: document.getElementById("sector").value,
+      factionStartDate: document.getElementById("factionStartDate").value,
+      factionStart: document.getElementById("factionStart").value,
+      activities: activities
+    };
+    saveJSON(STORAGE_STATE, state);
+    if (activities.length && !isExampleData) flashSaved();
+  }
+
+  function computeRows(unitFactionStartDate, unitFactionStart, acts) {
+    var factionStartD = toDate(unitFactionStartDate, unitFactionStart);
+    var prevActivityEndD = factionStartD;
+    var cumulative = 0;
+    var rowsData = [];
+    var hasError = false;
+
+    acts.forEach(function (act, idx) {
+      var startD = toDate(act.startDate, act.start);
+      var activityEndD = toDate(act.activityEndDate, act.activityEnd);
+      var callEndD = toDate(act.callEndDate, act.callEnd);
+      var workEndD = activityEndD || callEndD || startD;
+
+      var workMin = diffMinutes(startD, workEndD);
+      var restMin = startD ? diffMinutes(prevActivityEndD, startD) : null;
+      var workError = workMin !== null && workMin < 0;
+      var restError = restMin !== null && restMin < 0;
+      var rowError = workError || restError;
+      if (rowError) hasError = true;
+
+      var resetted = restMin !== null && restMin >= 8 * 60;
+      if (resetted || (idx === 0 && restMin === null)) {
+        cumulative = workMin || 0;
+      } else {
+        cumulative = (restMin !== null && restMin >= 8 * 60 ? 0 : cumulative) + (workMin || 0);
+      }
+
+      rowsData.push({ workMin: workMin, restMin: restMin, cumulative: cumulative, error: rowError, workError: workError, restError: restError });
+      if (workEndD) prevActivityEndD = workEndD;
+    });
+
+    return { rowsData: rowsData, lastActivityEndD: prevActivityEndD, hasError: hasError };
+  }
+
+  function render() {
+    listEl.innerHTML = "";
+    exampleFlag.style.display = isExampleData ? "inline-block" : "none";
+
+    var factionStartDate = document.getElementById("factionStartDate").value;
+    var factionStart = document.getElementById("factionStart").value;
+    var calc = computeRows(factionStartDate, factionStart, activities);
+
+    if (!activities.length) {
+      var hint = document.createElement("div");
+      hint.className = "empty-hint";
+      hint.textContent = "Aucune activité — ajoutez votre premier appel ou tâche depuis le début de votre période de faction.";
+      listEl.appendChild(hint);
+    }
+
+    activities.forEach(function (act, idx) {
+      var rd = calc.rowsData[idx];
+      var row = document.createElement("div");
+      row.className = "activity";
+      row.innerHTML =
+        '<div class="activity-head">' +
+          '<span class="activity-num">Activité ' + (idx + 1) + '</span>' +
+          '<button class="remove-btn" type="button" data-idx="' + idx + '">Retirer</button>' +
+        '</div>' +
+        '<div class="field-row">' +
+          '<div><label>Début (appel ou tâche)</label><div class="dt-pair">' +
+            '<input type="date" data-idx="' + idx + '" data-field="startDate" value="' + act.startDate + '">' +
+            '<input type="time" data-idx="' + idx + '" data-field="start" value="' + act.start + '"></div></div>' +
+          '<div><label>Fin de l\'appel (si appel)</label><div class="dt-pair">' +
+            '<input type="date" data-idx="' + idx + '" data-field="callEndDate" value="' + act.callEndDate + '">' +
+            '<input type="time" data-idx="' + idx + '" data-field="callEnd" value="' + act.callEnd + '"></div></div>' +
+        '</div>' +
+        '<div class="field-row" style="grid-template-columns:1fr;">' +
+          '<div><label>Fin de l\'activité / retour au poste</label><div class="dt-pair">' +
+            '<input type="date" data-idx="' + idx + '" data-field="activityEndDate" value="' + act.activityEndDate + '">' +
+            '<input type="time" data-idx="' + idx + '" data-field="activityEnd" value="' + act.activityEnd + '"></div></div>' +
+        '</div>' +
+        '<div class="activity-calc">' +
+          (rd.workError
+            ? '<span style="color:var(--crit-fg);font-weight:700;">La fin de cette activité précède son début — vérifiez la date de fin</span>'
+            : rd.restError
+            ? '<span style="color:var(--crit-fg);font-weight:700;">Le début de cette activité précède la fin de l\'activité précédente — vérifiez les dates</span>'
+            : 'Travail : <b>' + fmtHM(rd.workMin) + '</b> · Repos avant : <b>' + (rd.restMin === null ? "—" : fmtHM(rd.restMin)) + '</b> · Cumul continu : <b>' + fmtHM(rd.cumulative) + '</b>') +
+        '</div>';
+      listEl.appendChild(row);
+    });
+
+    computeResult(calc.rowsData, calc.lastActivityEndD, calc.hasError);
+    persistCurrentState();
+  }
+
+  var lastComputed = null;
+
+  function computeResult(rowsData, lastActivityEndD, hasError) {
+    var resultEl = document.getElementById("result");
+    var label = document.getElementById("resultLabel");
+    var msg = document.getElementById("resultMsg");
+    var detail = document.getElementById("resultDetail");
+    var cumulValueEl = document.getElementById("resultCumulValue");
+
+    if (!rowsData.length) {
+      resultEl.className = "result";
+      cumulValueEl.textContent = "—";
+      label.textContent = "Statut";
+      msg.textContent = "Ajoutez au moins une activité";
+      detail.textContent = "";
+      lastComputed = { state: "none", msg: msg.textContent, detail: "", totalContinu: null, restSinceLast: null };
+      updateEmailPreview();
+      return;
+    }
+
+    if (hasError) {
+      resultEl.className = "result crit";
+      cumulValueEl.textContent = "—";
+      label.textContent = "Saisie à corriger";
+      msg.textContent = "Une date ou une heure de fin précède son début";
+      detail.textContent = "Vérifiez les dates de chaque activité (une activité qui chevauche minuit doit avoir une date de fin le lendemain).";
+      lastComputed = { state: "crit", msg: msg.textContent, detail: detail.textContent, totalContinu: null, restSinceLast: null };
+      updateEmailPreview();
+      return;
+    }
+
+    var last = rowsData[rowsData.length - 1];
+    var cumul = last.cumulative;
+    var nowD = toDate(document.getElementById("nowTimeDate").value, document.getElementById("nowTime").value);
+    var restSinceLast = (nowD && lastActivityEndD) ? diffMinutes(lastActivityEndD, nowD) : 0;
+    if (restSinceLast !== null && restSinceLast < 0) {
+      resultEl.className = "result crit";
+      cumulValueEl.textContent = "—";
+      label.textContent = "Saisie à corriger";
+      msg.textContent = "L'heure « maintenant » précède la fin de la dernière activité";
+      detail.textContent = "Vérifiez la date/heure actuelle en haut de page.";
+      lastComputed = { state: "crit", msg: msg.textContent, detail: detail.textContent, totalContinu: null, restSinceLast: null };
+      updateEmailPreview();
+      return;
+    }
+
+    var effectiveRest = restSinceLast || 0;
+    var totalContinu = cumul + (effectiveRest < 4 * 60 ? effectiveRest : 0);
+    var state = "ok";
+    var restOk4 = effectiveRest >= 4 * 60;
+    var restOk8 = effectiveRest >= 8 * 60;
+
+    if (restOk8) {
+      state = "ok";
+      msg.textContent = "Vous êtes en repos suffisant (8 h+) — le compteur est à zéro";
+      detail.textContent = "Aucune démarche à faire pour l'instant. Le calcul reprendra à votre prochaine activité.";
+    } else {
+      var effectiveCumul = totalContinu;
+      if (effectiveCumul >= 24 * 60) {
+        state = "crit";
+        msg.textContent = "24e heure atteinte — non-disponibilité obligatoire (règle du 24 h)";
+        detail.textContent = "Appelez le superviseur de garde immédiatement (art. 4.5).";
+      } else if (effectiveCumul >= 17 * 60 && !restOk8) {
+        state = "soon";
+        msg.textContent = "Admissible dès maintenant à la règle du 24 h";
+        detail.textContent = "Vous pouvez appeler le superviseur de garde pour demander votre non-disponibilité (art. 4.5).";
+      } else if (effectiveCumul >= 16 * 60 && !restOk4) {
+        state = "crit";
+        msg.textContent = "16e heure atteinte — non-disponibilité obligatoire (règle du 16 h)";
+        detail.textContent = "Appelez le superviseur de garde immédiatement (art. 4.4).";
+      } else if (effectiveCumul >= 12 * 60 && !restOk4) {
+        state = "soon";
+        msg.textContent = "Admissible dès maintenant à la règle du 16 h";
+        detail.textContent = "Vous pouvez appeler le superviseur de garde pour demander votre non-disponibilité (art. 4.4).";
+      } else if (effectiveCumul >= 14 * 60 && !restOk8) {
+        state = "watch";
+        msg.textContent = "Approche de la règle du 24 h — à surveiller";
+        detail.textContent = "Vous n'êtes pas encore qualifié. Informez le superviseur de garde de la situation dès maintenant (art. 4.5).";
+      } else if (effectiveCumul >= 10 * 60 && !restOk4) {
+        state = "watch";
+        msg.textContent = "Approche de la règle du 16 h — à surveiller";
+        detail.textContent = "Vous n'êtes pas encore qualifié. Informez le superviseur de garde de la situation dès maintenant (art. 4.4).";
+      } else {
+        state = "ok";
+        msg.textContent = "Sous les seuils — aucune démarche requise";
+        detail.textContent = "Continuez à consigner vos activités; l'outil vous avertira à l'approche d'un seuil.";
+      }
+    }
+
+    resultEl.className = "result " + state;
+    cumulValueEl.textContent = fmtHM(totalContinu);
+    label.textContent = restSinceLast ? "Repos en cours : " + fmtHM(restSinceLast) : "Statut";
+
+    lastComputed = { state: state, msg: msg.textContent, detail: detail.textContent, totalContinu: totalContinu, restSinceLast: restSinceLast };
+    updateEmailPreview();
+  }
+
+  // ---------- rapport complet (courriel / copie / archive) ----------
+  // Hors du bac à sable d'un Artifact, mailto: fonctionne normalement — le bouton
+  // "Envoyer le rapport complet" ouvre directement l'application de courriel par
+  // défaut, avec le détail de CHAQUE activité (pas seulement un résumé agrégé).
+  var currentEmailText = "";
+  var currentEmailSubject = "";
+
+  function buildReportText(shiftMeta, rowsData, computed) {
+    var unitId = shiftMeta.unitId || "(non précisé)";
+    var sector = shiftMeta.sector || "(non précisé)";
+    var factionStartDate = shiftMeta.factionStartDate || "?";
+    var factionStart = shiftMeta.factionStart || "?";
+    var acts = shiftMeta.activities || [];
+
+    var lines = [
+      "CONSTAT PROOPE011 — " + unitId,
+      "Secteur : " + sector,
+      "Début de la période de faction : " + fmtDateFR(factionStartDate) + " à " + factionStart,
+      "Généré le : " + fmtDateFR(isoDate(new Date())) + " à " + isoTime(new Date()),
+      "",
+      "RÉSULTAT : " + (computed ? computed.msg : "—"),
+    ];
+    if (computed && computed.detail) lines.push(computed.detail);
+    if (computed && computed.totalContinu !== null && computed.totalContinu !== undefined) {
+      lines.push("Cumul de travail continu : " + fmtHM(computed.totalContinu));
+    }
+    lines.push("");
+    lines.push("DÉTAIL DES ACTIVITÉS (" + acts.length + ")");
+    lines.push("");
+
+    acts.forEach(function (act, idx) {
+      var rd = rowsData[idx] || {};
+      var fin = act.activityEndDate ? (fmtDateFR(act.activityEndDate) + " " + act.activityEnd)
+        : act.callEndDate ? (fmtDateFR(act.callEndDate) + " " + act.callEnd) : "en cours";
+      lines.push(
+        (idx + 1) + ". Début " + fmtDateFR(act.startDate) + " " + act.start +
+        " → Fin " + fin +
+        "  |  Travail : " + fmtHM(rd.workMin) +
+        "  |  Repos avant : " + (rd.restMin == null ? "—" : fmtHM(rd.restMin)) +
+        "  |  Cumul : " + fmtHM(rd.cumulative)
+      );
+    });
+
+    lines.push("");
+    lines.push("— Généré par l'outil PROOPE011, Ambulance Chicoutimi SLN —");
+
+    return lines.join("\n");
+  }
+
+  function currentShiftMeta() {
+    return {
+      unitId: document.getElementById("unitId").value,
+      sector: document.getElementById("sector").value,
+      factionStartDate: document.getElementById("factionStartDate").value,
+      factionStart: document.getElementById("factionStart").value,
+      activities: activities
+    };
+  }
+
+  function updateEmailPreview() {
+    var shiftMeta = currentShiftMeta();
+    var calc = computeRows(shiftMeta.factionStartDate, shiftMeta.factionStart, shiftMeta.activities);
+    var text = buildReportText(shiftMeta, calc.rowsData, lastComputed);
+    var subjectMsg = (lastComputed && lastComputed.msg) || "Constat";
+    currentEmailSubject = "PROOPE011 — " + (shiftMeta.unitId || "constat") + " — " + subjectMsg;
+    currentEmailText = text;
+    document.getElementById("emailPreview").textContent = currentEmailText;
+    document.getElementById("sendEmailBtn").href = "mailto:?subject=" + encodeURIComponent(currentEmailSubject) + "&body=" + encodeURIComponent(currentEmailText);
+  }
+
+  function copyToClipboard(text, btn, doneLabel) {
+    function done(ok) {
+      var original = btn.getAttribute("data-original-label") || btn.textContent;
+      btn.setAttribute("data-original-label", original);
+      btn.textContent = ok ? "Copié ✓" : "Copie impossible — sélectionnez le texte manuellement";
+      setTimeout(function () { btn.textContent = original; }, 2200);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    } else {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        done(ok);
+      } catch (err) { done(false); }
+    }
+  }
+
+  document.getElementById("copyEmailBtn").addEventListener("click", function () {
+    copyToClipboard(currentEmailText, this);
+  });
+
+  // ---------- historique ----------
+  function getHistory() { return loadJSON(STORAGE_HISTORY, []); }
+  function setHistory(list) { saveJSON(STORAGE_HISTORY, list); renderHistory(); updateHistCount(); }
+
+  function updateHistCount() {
+    document.getElementById("histCount").textContent = getHistory().length;
+  }
+
+  function archiveCurrentShift() {
+    if (!activities.length) {
+      alert("Ajoutez au moins une activité avant d'archiver ce constat.");
+      return;
+    }
+    var shiftMeta = currentShiftMeta();
+    var calc = computeRows(shiftMeta.factionStartDate, shiftMeta.factionStart, shiftMeta.activities);
+    var entry = {
+      id: "h" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+      savedAt: new Date().toISOString(),
+      unitId: shiftMeta.unitId,
+      sector: shiftMeta.sector,
+      factionStartDate: shiftMeta.factionStartDate,
+      factionStart: shiftMeta.factionStart,
+      activities: shiftMeta.activities,
+      result: lastComputed ? { state: lastComputed.state, msg: lastComputed.msg, detail: lastComputed.detail, totalContinu: lastComputed.totalContinu } : null
+    };
+    var hist = getHistory();
+    hist.unshift(entry);
+    setHistory(hist);
+    return entry;
+  }
+
+  function renderHistory() {
+    var hist = getHistory();
+    var listEl2 = document.getElementById("historyList");
+    var emptyHint = document.getElementById("historyEmptyHint");
+    listEl2.innerHTML = "";
+    emptyHint.style.display = hist.length ? "none" : "block";
+
+    hist.forEach(function (entry) {
+      var calc = computeRows(entry.factionStartDate, entry.factionStart, entry.activities);
+      var d = new Date(entry.savedAt);
+      var dateLabel = isoDate(d) === isoDate(new Date()) ? "Aujourd'hui" : fmtDateFR(isoDate(d));
+      var timeLabel = isoTime(d);
+
+      var wrap = document.createElement("div");
+      wrap.className = "hist-entry";
+      wrap.setAttribute("data-id", entry.id);
+
+      var state = (entry.result && entry.result.state) || "ok";
+      var head = document.createElement("div");
+      head.className = "hist-entry-head";
+      head.innerHTML =
+        '<span class="hist-dot ' + state + '"></span>' +
+        '<span class="hist-main">' +
+          '<div class="hist-title">' + (entry.unitId || "(équipe non précisée)") + ' — ' + (entry.sector || "(secteur non précisé)") + '</div>' +
+          '<div class="hist-sub">Archivé ' + dateLabel + ' à ' + timeLabel + ' · ' + entry.activities.length + ' activité(s) · ' + ((entry.result && entry.result.msg) || "—") + '</div>' +
+        '</span>' +
+        '<span class="hist-chevron">▸</span>';
+      wrap.appendChild(head);
+
+      var body = document.createElement("div");
+      body.className = "hist-body";
+
+      var table = document.createElement("table");
+      table.className = "hist-detail-table";
+      var thead = "<tr><th>#</th><th>Début</th><th>Fin</th><th>Travail</th><th>Repos</th><th>Cumul</th></tr>";
+      var trows = entry.activities.map(function (act, idx) {
+        var rd = calc.rowsData[idx] || {};
+        var fin = act.activityEndDate ? (fmtDateFR(act.activityEndDate) + " " + act.activityEnd)
+          : act.callEndDate ? (fmtDateFR(act.callEndDate) + " " + act.callEnd) : "en cours";
+        return "<tr><td>" + (idx + 1) + "</td><td>" + fmtDateFR(act.startDate) + " " + act.start + "</td><td>" + fin + "</td><td>" + fmtHM(rd.workMin) + "</td><td>" + (rd.restMin == null ? "—" : fmtHM(rd.restMin)) + "</td><td>" + fmtHM(rd.cumulative) + "</td></tr>";
+      }).join("");
+      table.innerHTML = thead + trows;
+      body.appendChild(table);
+
+      var actions = document.createElement("div");
+      actions.className = "hist-actions";
+
+      var sendBtn = document.createElement("a");
+      sendBtn.className = "email-btn small";
+      sendBtn.textContent = "Envoyer par courriel";
+      var reportText = buildReportText(entry, calc.rowsData, entry.result);
+      var subj = "PROOPE011 — " + (entry.unitId || "constat") + " — " + ((entry.result && entry.result.msg) || "Constat archivé");
+      sendBtn.href = "mailto:?subject=" + encodeURIComponent(subj) + "&body=" + encodeURIComponent(reportText);
+      actions.appendChild(sendBtn);
+
+      var copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "email-btn secondary small";
+      copyBtn.textContent = "Copier";
+      copyBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        copyToClipboard(reportText, copyBtn);
+      });
+      actions.appendChild(copyBtn);
+
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "email-btn danger small";
+      delBtn.textContent = "Supprimer";
+      delBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var h = getHistory().filter(function (x) { return x.id !== entry.id; });
+        setHistory(h);
+      });
+      actions.appendChild(delBtn);
+
+      body.appendChild(actions);
+      wrap.appendChild(body);
+
+      head.addEventListener("click", function () {
+        wrap.classList.toggle("open");
+      });
+
+      listEl2.appendChild(wrap);
+    });
+  }
+
+  document.getElementById("archiveBtn").addEventListener("click", function () {
+    var entry = archiveCurrentShift();
+    if (entry) {
+      var btn = this;
+      var original = btn.textContent;
+      btn.textContent = "Archivé ✓";
+      setTimeout(function () { btn.textContent = original; }, 1800);
+    }
+  });
+
+  document.getElementById("clearHistoryBtn").addEventListener("click", function () {
+    if (!getHistory().length) return;
+    if (confirm("Supprimer définitivement tous les constats archivés sur cet appareil ?")) {
+      setHistory([]);
+    }
+  });
+
+  // ---------- nouveau quart ----------
+  document.getElementById("newShiftBtn").addEventListener("click", function () {
+    if (activities.length) {
+      var ok = confirm("Archiver le quart actuel dans l'historique avant de commencer un nouveau quart ?");
+      if (ok) archiveCurrentShift();
+    }
+    isExampleData = false;
+    activities = [];
+    document.getElementById("unitId").value = "";
+    document.getElementById("sector").value = "";
+    document.getElementById("factionStartDate").value = isoDate(new Date());
+    document.getElementById("factionStart").value = isoTime(new Date());
+    render();
+  });
+
+  // ---------- onglets ----------
+  function switchTab(tab) {
+    var isCurrent = tab === "current";
+    document.getElementById("viewCurrent").classList.toggle("active", isCurrent);
+    document.getElementById("viewHistory").classList.toggle("active", !isCurrent);
+    document.getElementById("tabBtnCurrent").classList.toggle("active", isCurrent);
+    document.getElementById("tabBtnHistory").classList.toggle("active", !isCurrent);
+    if (!isCurrent) renderHistory();
+    window.scrollTo(0, 0);
+  }
+  document.getElementById("tabBtnCurrent").addEventListener("click", function () { switchTab("current"); });
+  document.getElementById("tabBtnHistory").addEventListener("click", function () { switchTab("history"); });
+
+  // ---------- écouteurs des champs ----------
+  addBtn.addEventListener("click", function () {
+    isExampleData = false;
+    activities.push(newActivity());
+    render();
+  });
+
+  listEl.addEventListener("input", function (e) {
+    var idx = e.target.getAttribute("data-idx");
+    var field = e.target.getAttribute("data-field");
+    if (idx === null || !field) return;
+    isExampleData = false;
+    activities[idx][field] = e.target.value;
+    render();
+  });
+
+  listEl.addEventListener("click", function (e) {
+    if (e.target.classList.contains("remove-btn")) {
+      var idx = parseInt(e.target.getAttribute("data-idx"), 10);
+      activities.splice(idx, 1);
+      render();
+    }
+  });
+
+  ["factionStart", "factionStartDate", "nowTime", "nowTimeDate", "unitId", "sector"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () {
+      if (id !== "nowTime" && id !== "nowTimeDate") isExampleData = false;
+      render();
+    });
+  });
+
+  // ---------- initialisation ----------
+  document.getElementById("unitId").value = initial.unitId || "";
+  document.getElementById("sector").value = initial.sector || "";
+  document.getElementById("factionStartDate").value = initial.factionStartDate || "";
+  document.getElementById("factionStart").value = initial.factionStart || "08:00";
+
+  // Date/heure actuelle par défaut = maintenant (locale du navigateur)
+  var now = new Date();
+  document.getElementById("nowTimeDate").value = isoDate(now);
+  document.getElementById("nowTime").value = isoTime(now);
+
+  updateHistCount();
+  render();
+})();
+</script>
+
+<script>
+// ---- Installation sur écran d'accueil (PWA) ----
+(function () {
+  "use strict";
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {
+        // Échec silencieux : l'outil fonctionne quand même sans mise en cache hors ligne.
+      });
+    });
+  }
+
+  var banner = document.getElementById("installBanner");
+  var installBtn = document.getElementById("installBtn");
+  var dismissBtn = document.getElementById("installDismiss");
+  var deferredPrompt = null;
+
+  function alreadyInstalled() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+  function dismissedRecently() {
+    try { return sessionStorage.getItem("proope011-install-dismissed") === "1"; }
+    catch (e) { return false; }
+  }
+
+  // Android / Chrome : événement natif d'installation
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (!alreadyInstalled() && !dismissedRecently()) {
+      banner.classList.add("show");
+    }
+  });
+
+  installBtn.addEventListener("click", function () {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.finally(function () {
+        deferredPrompt = null;
+        banner.classList.remove("show");
+      });
+    }
+  });
+
+  dismissBtn.addEventListener("click", function () {
+    banner.classList.remove("show");
+    try { sessionStorage.setItem("proope011-install-dismissed", "1"); } catch (e) {}
+  });
+
+  // iOS Safari n'émet jamais beforeinstallprompt : on affiche une instruction manuelle.
+  var isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  var isSafari = /safari/i.test(window.navigator.userAgent) && !/crios|fxios|edgios/i.test(window.navigator.userAgent);
+  if (isIOS && isSafari && !alreadyInstalled() && !dismissedRecently()) {
+    document.getElementById("installBannerText").textContent =
+      "Pour installer cet outil : appuyez sur le bouton Partager, puis « Sur l'écran d'accueil ».";
+    installBtn.style.display = "none";
+    banner.classList.add("show");
+  }
+})();
+</script>
+
+</body>
+</html>
