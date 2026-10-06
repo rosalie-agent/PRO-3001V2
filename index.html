@@ -676,8 +676,11 @@
     <p style="font-size:13px; color:#5b6b7c; margin-top:0;">Entrez votre numéro d'employé pour utiliser l'outil PROOPE011. Ça permet d'assurer le suivi de la qualité des données saisies.</p>
     <label for="tapCodeInput" style="display:block; font-size:13px; color:#5b6b7c; margin-bottom:6px;">Numéro d'employé</label>
     <input type="text" id="tapCodeInput" inputmode="numeric" placeholder="ex. 4821" style="width:100%; padding:10px 12px; border:1px solid #d7dee6; border-radius:8px; font-size:16px; margin-bottom:12px;">
+    <label for="tapPasswordInput" style="display:block; font-size:13px; color:#5b6b7c; margin-bottom:6px;">Mot de passe</label>
+    <input type="password" id="tapPasswordInput" placeholder="•••••••••" style="width:100%; padding:10px 12px; border:1px solid #d7dee6; border-radius:8px; font-size:16px; margin-bottom:4px;">
+    <p style="font-size:11.5px; color:#5b6b7c; margin:0 0 12px;">La première fois, utilisez le mot de passe donné par votre superviseur. Vous pourrez le changer vous-même par la suite.</p>
     <button id="tapCodeBtn" type="button" style="width:100%; padding:11px; border:none; border-radius:8px; background:#0b3d78; color:#fff; font-size:15px; font-weight:600; cursor:pointer;">Confirmer</button>
-    <div id="tapCodeError" style="display:none; color:#a31212; font-size:13px; margin-top:10px;">Numéro d'employé non reconnu — vérifiez auprès de votre superviseur.</div>
+    <div id="tapCodeError" style="display:none; color:#a31212; font-size:13px; margin-top:10px;">Numéro d'employé ou mot de passe incorrect.</div>
   </div>
 </div>
 
@@ -686,9 +689,12 @@
     <div class="brandtext">Ambulance Chicoutimi SLN</div>
     <div class="brandsub">PROOPE011</div>
   </div>
-  <div id="tapIdentityBar" style="display:none; font-size:12px; color:#cfe0f5; padding:4px 0 0; display:flex; justify-content:space-between; align-items:center;">
+  <div id="tapIdentityBar" style="display:none; font-size:12px; color:#cfe0f5; padding:4px 0 0; justify-content:space-between; align-items:center; gap:10px;">
     <span>Connecté : <b id="tapIdentityName" style="color:#fff;">—</b></span>
-    <button id="tapChangeBtn" type="button" style="background:none; border:none; color:#cfe0f5; font-size:12px; text-decoration:underline; cursor:pointer; padding:0;">Changer de TAP</button>
+    <span>
+      <button id="tapChangePwBtn" type="button" style="background:none; border:none; color:#cfe0f5; font-size:12px; text-decoration:underline; cursor:pointer; padding:0; margin-right:10px;">Changer mon mot de passe</button>
+      <button id="tapChangeBtn" type="button" style="background:none; border:none; color:#cfe0f5; font-size:12px; text-decoration:underline; cursor:pointer; padding:0;">Changer de TAP</button>
+    </span>
   </div>
 </div>
 
@@ -1011,7 +1017,9 @@
   };
 
   var STORAGE_TAP_SESSION = "proope011_tap_session_v1";
+  var STORAGE_TAP_PW_CACHE = "proope011_tap_pw_cache_v1"; // { matricule: motDePasseActuel } — copie locale pour fonctionner hors ligne
   var TAP_SESSION_DAYS = 7;
+  var TAP_DEFAULT_PASSWORD = "welcome"; // mot de passe de départ, le même pour tous — chacun peut le changer ensuite
 
   function getTapSession() {
     var s = loadJSON(STORAGE_TAP_SESSION, null);
@@ -1029,6 +1037,17 @@
     try { localStorage.removeItem(STORAGE_TAP_SESSION); } catch (e) {}
   }
 
+  function getCachedPassword(matricule) {
+    var map = loadJSON(STORAGE_TAP_PW_CACHE, {});
+    return map[matricule] || null;
+  }
+
+  function setCachedPassword(matricule, password) {
+    var map = loadJSON(STORAGE_TAP_PW_CACHE, {});
+    map[matricule] = password;
+    saveJSON(STORAGE_TAP_PW_CACHE, map);
+  }
+
   function updateTapIdentityBar() {
     var s = getTapSession();
     var bar = document.getElementById("tapIdentityBar");
@@ -1043,6 +1062,7 @@
   function showTapLock() {
     document.getElementById("tapLockScreen").style.display = "flex";
     document.getElementById("tapCodeInput").value = "";
+    document.getElementById("tapPasswordInput").value = "";
     document.getElementById("tapCodeError").style.display = "none";
     setTimeout(function () { document.getElementById("tapCodeInput").focus(); }, 50);
   }
@@ -1051,15 +1071,64 @@
     document.getElementById("tapLockScreen").style.display = "none";
   }
 
+  // Détermine le mot de passe attendu pour ce matricule : d'abord la copie locale
+  // (si ce TAP s'est déjà connecté sur cet appareil ou l'a changé), sinon on va voir
+  // sur le cloud s'il l'a changé ailleurs, sinon on retombe sur le mot de passe de
+  // départ commun. Fonctionne hors ligne grâce à la copie locale.
+  function resolveExpectedPassword(matricule, callback) {
+    var cached = getCachedPassword(matricule);
+    if (cached) { callback(cached); return; }
+    if (cloudDb) {
+      cloudDb.collection("tap_passwords").doc(matricule).get().then(function (doc) {
+        if (doc.exists && doc.data().password) {
+          callback(doc.data().password);
+        } else {
+          callback(TAP_DEFAULT_PASSWORD);
+        }
+      }).catch(function () { callback(TAP_DEFAULT_PASSWORD); });
+    } else {
+      callback(TAP_DEFAULT_PASSWORD);
+    }
+  }
+
   function attemptTapLogin() {
     var raw = document.getElementById("tapCodeInput").value.trim().toUpperCase();
-    if (TAP_CODES.hasOwnProperty(raw)) {
-      setTapSession(raw, TAP_CODES[raw]);
-      updateTapIdentityBar();
-      hideTapLock();
-    } else {
+    var pw = document.getElementById("tapPasswordInput").value;
+    if (!TAP_CODES.hasOwnProperty(raw)) {
       document.getElementById("tapCodeError").style.display = "block";
+      return;
     }
+    var btn = document.getElementById("tapCodeBtn");
+    btn.disabled = true;
+    resolveExpectedPassword(raw, function (expected) {
+      btn.disabled = false;
+      if (pw === expected) {
+        setCachedPassword(raw, expected); // mémorise pour les prochaines connexions hors ligne
+        setTapSession(raw, TAP_CODES[raw]);
+        updateTapIdentityBar();
+        hideTapLock();
+      } else {
+        document.getElementById("tapCodeError").style.display = "block";
+      }
+    });
+  }
+
+  function changeTapPassword() {
+    var s = getTapSession();
+    if (!s) return;
+    var newPw = prompt("Nouveau mot de passe pour " + s.name + " :");
+    if (!newPw) return;
+    var confirmPw = prompt("Retapez le nouveau mot de passe pour confirmer :");
+    if (newPw !== confirmPw) {
+      alert("Les deux mots de passe ne correspondent pas — rien n'a été changé.");
+      return;
+    }
+    setCachedPassword(s.matricule, newPw);
+    if (cloudDb) {
+      cloudDb.collection("tap_passwords").doc(s.matricule).set({ password: newPw, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+        .catch(function (e) { console.warn("Mise à jour du mot de passe sur le cloud échouée (sera réessayée en ligne) :", e); });
+    }
+    alert("Mot de passe changé.");
   }
 
   // ---------- stockage local (par appareil) ----------
@@ -1757,18 +1826,21 @@
   document.getElementById("tapCodeInput").addEventListener("keydown", function (e) {
     if (e.key === "Enter") attemptTapLogin();
   });
+  document.getElementById("tapPasswordInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") attemptTapLogin();
+  });
   document.getElementById("tapChangeBtn").addEventListener("click", function () {
-    var ok = confirm("Changer de TAP ? La personne suivante devra entrer son propre numéro d'employé.");
+    var ok = confirm("Changer de TAP ? La personne suivante devra entrer son propre numéro d'employé et son mot de passe.");
     if (ok) {
       clearTapSession();
       updateTapIdentityBar();
       showTapLock();
     }
   });
+  document.getElementById("tapChangePwBtn").addEventListener("click", changeTapPassword);
 
-  if (getTapSession()) {
-    updateTapIdentityBar();
-  } else {
+  updateTapIdentityBar();
+  if (!getTapSession()) {
     showTapLock();
   }
 })();
