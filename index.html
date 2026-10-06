@@ -880,10 +880,39 @@
   })();
 
   var cloudPushTimer = null;
+  var lastSyncedUnitId = null; // pour nettoyer l'ancienne fiche si le numéro de véhicule est corrigé
   function pushLiveStatusToCloud(shiftMeta) {
     if (!cloudDb || !shiftMeta.unitId) return;
+
+    // Tant qu'on tape encore dans le champ "Autre…" (numéro de véhicule en texte libre),
+    // on NE synchronise PAS à chaque frappe — sinon chaque fragment tapé en cours de route
+    // (ex. "3", puis "36", puis "367"...) crée sa propre fiche fantôme sur le tableau de
+    // bord. On attend que le champ perde le focus (voir l'écouteur "blur" plus bas) ou
+    // qu'un véhicule soit choisi dans la liste déroulante.
+    var unitIdInputEl = document.getElementById("unitId");
+    var unitIdSelectEl = document.getElementById("unitIdSelect");
+    var typingCustomUnit = document.activeElement === unitIdInputEl && unitIdSelectEl && unitIdSelectEl.value === "__autre__";
+    if (typingCustomUnit) return;
+
     clearTimeout(cloudPushTimer);
     cloudPushTimer = setTimeout(function () {
+      var tap = getTapSession();
+
+      // Si le numéro de véhicule de CE quart vient de changer (ex. correction d'une
+      // erreur de frappe), supprime l'ancienne fiche qu'on avait nous-mêmes créée — mais
+      // seulement si c'est bien nous qui l'avions créée (on ne touche jamais à la fiche
+      // d'un autre véhicule/TAP).
+      if (lastSyncedUnitId && lastSyncedUnitId !== shiftMeta.unitId) {
+        var staleId = lastSyncedUnitId;
+        cloudDb.collection("vehicules").doc(staleId).get().then(function (doc) {
+          var data = doc.data();
+          if (data && data.enteredBy && tap && data.enteredBy.matricule === tap.matricule) {
+            cloudDb.collection("vehicules").doc(staleId).delete().catch(function () {});
+          }
+        }).catch(function () {});
+      }
+      lastSyncedUnitId = shiftMeta.unitId;
+
       cloudDb.collection("vehicules").doc(shiftMeta.unitId).set({
         unitId: shiftMeta.unitId,
         sector: shiftMeta.sector,
@@ -899,7 +928,7 @@
           totalContinu8: lastComputed.totalContinu8,
           restSinceLast: lastComputed.restSinceLast
         } : null,
-        enteredBy: getTapSession() ? { matricule: getTapSession().matricule, name: getTapSession().name } : null,
+        enteredBy: tap ? { matricule: tap.matricule, name: tap.name } : null,
         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true }).catch(function (e) { console.warn("Synchronisation cloud échouée (pas de réseau ?) :", e); });
     }, 600); // léger délai pour ne pas envoyer une requête à chaque frappe de clavier
@@ -1827,6 +1856,12 @@
       unitIdInput.style.display = "none";
     }
   }
+
+  // Dès que le champ "Autre…" perd le focus, on force une synchronisation immédiate
+  // (render() va appeler pushLiveStatusToCloud, qui ne sera plus bloqué puisque le
+  // focus a quitté le champ) — ça évite d'attendre une autre frappe pour voir le
+  // véhicule final apparaître sur le tableau de bord.
+  unitIdInput.addEventListener("blur", function () { render(); });
 
   unitIdSelect.addEventListener("change", function () {
     if (unitIdSelect.value === "__autre__") {

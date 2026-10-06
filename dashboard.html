@@ -76,7 +76,7 @@
   #loginError { color: var(--crit-fg); font-size: 13px; margin-top: 12px; display: none; }
 
   /* ---------- bandeau de synthèse ---------- */
-  .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 22px; }
+  .stats-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 22px; }
   .stat-tile {
     background: var(--card); border: 1px solid var(--border); border-radius: 6px;
     padding: 12px 14px; border-top: 3px solid var(--none-bar);
@@ -85,9 +85,10 @@
   .stat-tile.watch { border-top-color: var(--watch-bar); }
   .stat-tile.soon { border-top-color: var(--soon-bar); }
   .stat-tile.crit { border-top-color: var(--crit-bar); }
+  .stat-tile.attention { border-top-color: #e2b84a; }
   .stat-tile-count { font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1; }
   .stat-tile-label { font-size: 11.5px; color: var(--sub); margin-top: 4px; letter-spacing: 0.01em; }
-  @media (max-width: 720px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 860px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
 
   .live-dot {
     display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #5ad68f;
@@ -145,7 +146,11 @@
   .vcard-msg { font-size: 13.5px; margin: 4px 0; line-height: 1.4; }
   .vcard-meta { font-size: 12px; color: var(--sub); margin-top: 10px; display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 8px; }
   .vcard-updated { font-size: 11px; color: var(--sub); margin-top: 6px; }
-  .vcard.stale { opacity: 0.6; }
+  .vcard.stale { border-color: #e2b84a; }
+  .vcard-attention {
+    background: #fdf3da; color: #7a5a0a; border: 1px solid #ecce85; border-radius: 4px;
+    padding: 7px 10px; font-size: 12px; font-weight: 600; margin: 9px 0; display: flex; align-items: center; gap: 6px;
+  }
   .vcard-detail-link { margin-top: 8px; font-size: 12px; color: var(--accent); cursor: pointer; display: inline-block; }
   .vcard-detail-link:hover { text-decoration: underline; }
   .empty-state { text-align: center; color: var(--sub); padding: 70px 20px; font-size: 14px; border: 1px dashed var(--border-strong); border-radius: 6px; }
@@ -516,11 +521,67 @@
     return acts[acts.length - 1];
   }
 
+  // ---------- projection « en direct » ----------
+  // Les chiffres que le TAP a envoyés datent de sa dernière synchronisation — sans
+  // rien de plus, ils restent figés jusqu'à ce qu'il rouvre l'application. On calcule
+  // ici ce qui s'est écoulé depuis cette synchronisation (selon l'horloge, pas selon
+  // ce que le TAP a tapé) pour que le repos ET le cumul de travail avancent tout seuls
+  // à l'écran. Au-delà du délai "donnée ancienne" (STALE_AFTER_MIN), on arrête la
+  // projection (on ne sait plus vraiment ce qui se passe) et on affiche un avertissement
+  // au lieu de continuer à deviner.
+  function liveSnapshot(v) {
+    var result = v.result || {};
+    if (result.totalContinu4 === undefined || result.totalContinu4 === null) {
+      return { restMin: result.restSinceLast, totalContinu4: result.totalContinu4, totalContinu8: result.totalContinu8, stale: isStale(v.lastUpdated), state: result.state, msg: result.msg };
+    }
+    var lastMs = tsToMillis(v.lastUpdated);
+    var stale = isStale(v.lastUpdated);
+    var elapsedMin = lastMs ? Math.max(0, (Date.now() - lastMs) / 60000) : 0;
+    var cappedElapsed = stale ? Math.min(elapsedMin, STALE_AFTER_MIN) : elapsedMin;
+
+    var restMin = result.restSinceLast || 0;
+    var c4 = result.totalContinu4;
+    var c8 = result.totalContinu8;
+
+    if (restMin > 0) {
+      restMin = restMin + cappedElapsed;
+      if (restMin >= 8 * 60) { c4 = 0; c8 = 0; }
+      else if (restMin >= 4 * 60) { c4 = 0; }
+    } else {
+      c4 = c4 + cappedElapsed;
+      c8 = c8 + cappedElapsed;
+    }
+
+    var st = liveState(c4, c8, restMin) || { state: result.state, msg: result.msg };
+    return { restMin: restMin, totalContinu4: c4, totalContinu8: c8, stale: stale, state: st.state, msg: st.msg };
+  }
+
+  // Reproduit les mêmes seuils que l'application des TAPs (art. 4.4 / 4.5), pour que
+  // le statut affiché ici reste exact même si personne n'a rouvert l'application
+  // depuis un moment.
+  function liveState(c4, c8, restMin) {
+    if (c4 === null || c4 === undefined) return null;
+    var restOk8 = restMin >= 8 * 60;
+    var restOk4 = restMin >= 4 * 60;
+    if (restOk8) return { state: "ok", msg: "Repos suffisant (8 h+) — compteur à zéro" };
+    if (c8 >= 24 * 60) return { state: "crit", msg: "24e heure atteinte — non-disponibilité obligatoire (règle du 24 h)" };
+    if (c4 >= 16 * 60 && !restOk4) return { state: "crit", msg: "16e heure atteinte — non-disponibilité obligatoire (règle du 16 h)" };
+    if (c8 >= 17 * 60 && !restOk8) return { state: "soon", msg: "Admissible dès maintenant à la règle du 24 h" };
+    if (c4 >= 12 * 60 && !restOk4) return { state: "soon", msg: "Admissible dès maintenant à la règle du 16 h" };
+    if (c8 >= 14 * 60 && !restOk8) return { state: "watch", msg: "Approche de la règle du 24 h — à surveiller" };
+    if (c4 >= 10 * 60 && !restOk4) return { state: "watch", msg: "Approche de la règle du 16 h — à surveiller" };
+    return { state: "ok", msg: "Sous les seuils — aucune démarche requise" };
+  }
+
   function renderStats(ids) {
     var counts = { ok: 0, watch: 0, soon: 0, crit: 0, none: 0 };
+    var attention = 0;
     ids.forEach(function (id) {
-      var state = (vehicleDocs[id].result || {}).state || "none";
+      var v = vehicleDocs[id];
+      var live = liveSnapshot(v);
+      var state = live.state || "none";
       counts[state] = (counts[state] || 0) + 1;
+      if (live.stale) attention++;
     });
     var html = "";
     STAT_ORDER.forEach(function (state) {
@@ -529,15 +590,17 @@
         '<div class="stat-tile-label">' + STAT_TILE_LABEL[state] + '</div>' +
       '</div>';
     });
+    html += '<div class="stat-tile attention"><div class="stat-tile-count">' + attention + '</div><div class="stat-tile-label">Sans nouvelle depuis ' + STALE_AFTER_MIN + '+ min</div></div>';
     $("statsRow").innerHTML = html;
   }
 
   function vcardHtml(id, v) {
     var result = v.result || {};
-    var state = result.state || "none";
-    var stale = isStale(v.lastUpdated);
-    var totalContinu4 = result.totalContinu4;
-    var totalContinu8 = result.totalContinu8;
+    var live = liveSnapshot(v);
+    var state = live.state || "none";
+    var stale = live.stale;
+    var totalContinu4 = live.totalContinu4;
+    var totalContinu8 = live.totalContinu8;
     var pct4 = totalContinu4 ? Math.min(100, (totalContinu4 / (16 * 60)) * 100) : 0;
     var pct8 = totalContinu8 ? Math.min(100, (totalContinu8 / (24 * 60)) * 100) : 0;
     var cls4 = thrClass(totalContinu4, 10 * 60, 12 * 60, 16 * 60);
@@ -547,10 +610,11 @@
     return '<div class="vcard-bar"></div>' +
         '<div class="vcard-body">' +
           '<div class="vcard-head"><div class="vcard-unit" data-unit="' + escapeHtml(id) + '" tabindex="0">' + escapeHtml(id) + '</div><div class="vcard-sector">' + escapeHtml(v.sector || "") + '</div></div>' +
-          '<div class="vcard-status ' + state + '">' + STATE_LABEL[state] + (stale ? " · info ancienne" : "") + '</div>' +
-          '<div class="vcard-msg">' + escapeHtml(result.msg || "—") + '</div>' +
-          '<div class="vcard-meta"><span>Cumul : ' + fmtHM(result.totalContinu) + '</span><span>Repos en cours : ' + fmtHM(result.restSinceLast) + '</span></div>' +
-          (result.totalContinu4 !== undefined ? (
+          '<div class="vcard-status ' + state + '">' + STATE_LABEL[state] + '</div>' +
+          (stale ? '<div class="vcard-attention">⚠ Aucune activité confirmée depuis ' + timeAgo(v.lastUpdated) + ' — vérifier avec le TAP</div>' : '') +
+          '<div class="vcard-msg">' + escapeHtml(live.msg || result.msg || "—") + '</div>' +
+          '<div class="vcard-meta"><span>Cumul : ' + fmtHM(Math.max(totalContinu4 || 0, totalContinu8 || 0)) + '</span><span>Repos en cours : ' + fmtHM(live.restMin) + '</span></div>' +
+          (totalContinu4 !== undefined && totalContinu4 !== null ? (
           '<div class="thresholds">' +
             '<div class="thr-row"><div class="thr-label"><span>Règle du 16 h (art. 4.4)</span><span>' + fmtHM(totalContinu4) + ' / 16h</span></div>' +
               '<div class="thr-track"><div class="thr-fill ' + cls4 + '" style="width:' + pct4.toFixed(0) + '%;"></div></div></div>' +
@@ -591,10 +655,9 @@
       html += '<div class="grid">';
       sectorIds.forEach(function (id) {
         var v = vehicleDocs[id];
-        var result = v.result || {};
-        var state = result.state || "none";
-        var stale = isStale(v.lastUpdated);
-        html += '<div class="vcard ' + state + (stale ? " stale" : "") + '">' + vcardHtml(id, v) + '</div>';
+        var live = liveSnapshot(v);
+        var state = live.state || "none";
+        html += '<div class="vcard ' + state + (live.stale ? " stale" : "") + '">' + vcardHtml(id, v) + '</div>';
       });
       html += '</div>';
     });
@@ -604,6 +667,12 @@
       el.addEventListener("click", function () { openDetail(el.getAttribute("data-unit")); });
     });
   }
+
+  // Fait avancer les compteurs "en direct" (repos et cumul de travail) même si
+  // personne ne touche à rien côté TAP ou côté tableau de bord.
+  setInterval(function () {
+    if (session && $("tabPanelLive").classList.contains("active") && Object.keys(vehicleDocs).length) renderGrid();
+  }, 30000);
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -693,15 +762,11 @@
     var working = [];
     ids.forEach(function (id) {
       var v = vehicleDocs[id];
-      var result = v.result || {};
-      var lastUpdatedMs = tsToMillis(v.lastUpdated);
-      var restMin = result.restSinceLast;
-      if (restMin && restMin > 0 && lastUpdatedMs) {
-        var restStartedAtMs = lastUpdatedMs - restMin * 60000;
-        var liveMin = (Date.now() - restStartedAtMs) / 60000;
-        resting.push({ id: id, sector: v.sector, liveMin: liveMin, stale: isStale(v.lastUpdated) });
+      var live = liveSnapshot(v);
+      if (live.restMin && live.restMin > 0) {
+        resting.push({ id: id, sector: v.sector, liveMin: live.restMin, stale: live.stale, lastUpdated: v.lastUpdated });
       } else {
-        working.push({ id: id, sector: v.sector, msg: result.msg || "—", state: result.state || "none" });
+        working.push({ id: id, sector: v.sector, msg: live.msg, state: live.state || "none", stale: live.stale, lastUpdated: v.lastUpdated });
       }
     });
     resting.sort(function (a, b) { return b.liveMin - a.liveMin; });
@@ -715,7 +780,7 @@
       resting.forEach(function (r) {
         html += '<div class="rest-item">' +
           '<div><span class="rest-item-unit">' + escapeHtml(r.id) + '</span><span class="rest-item-sector">' + escapeHtml(r.sector || "") + '</span>' +
-          (r.stale ? '<div class="rest-item-sub">Donnée possiblement ancienne — non confirmée depuis un moment</div>' : '') + '</div>' +
+          (r.stale ? '<div class="rest-item-sub">⚠ Aucune confirmation depuis ' + timeAgo(r.lastUpdated) + ' — à vérifier</div>' : '') + '</div>' +
           '<div class="rest-item-duration">' + fmtHM(r.liveMin) + ' de repos</div>' +
         '</div>';
       });
@@ -729,8 +794,9 @@
       html += '<div class="rest-list">';
       working.forEach(function (w) {
         html += '<div class="rest-item active-work">' +
-          '<div><span class="rest-item-unit">' + escapeHtml(w.id) + '</span><span class="rest-item-sector">' + escapeHtml(w.sector || "") + '</span></div>' +
-          '<div class="rest-item-duration">' + escapeHtml(STATE_LABEL[w.state] || w.msg) + '</div>' +
+          '<div><span class="rest-item-unit">' + escapeHtml(w.id) + '</span><span class="rest-item-sector">' + escapeHtml(w.sector || "") + '</span>' +
+          (w.stale ? '<div class="rest-item-sub">⚠ Aucune confirmation depuis ' + timeAgo(w.lastUpdated) + ' — à vérifier</div>' : '') + '</div>' +
+          '<div class="rest-item-duration">' + escapeHtml(STATE_LABEL[w.state] || w.msg || "—") + '</div>' +
         '</div>';
       });
       html += '</div>';
