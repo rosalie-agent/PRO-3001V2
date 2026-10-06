@@ -7,7 +7,7 @@
 // installé l'appli continuent de voir l'ancienne version indéfiniment, même
 // après un nouveau déploiement sur GitHub — le navigateur ne redétecte une
 // mise à jour du service worker que si le contenu de CE fichier change.
-const CACHE_NAME = "proope011-v2";
+const CACHE_NAME = "proope011-v4";
 const ASSETS = [
   "./",
   "./index.html",

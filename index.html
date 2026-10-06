@@ -947,7 +947,13 @@
   function computeRows(unitFactionStartDate, unitFactionStart, acts) {
     var factionStartD = toDate(unitFactionStartDate, unitFactionStart);
     var prevActivityEndD = factionStartD;
-    var cumulative = 0;
+    // Deux compteurs distincts, car un repos de 4-8h ne remet à zéro QUE la
+    // règle du 16h (art. 4.4) — la règle du 24h (art. 4.5) exige spécifiquement
+    // 8h consécutives (art. 4.6) pour être remise à zéro. Confirmé par Rose :
+    // un repos de 5-7h « est bon pour la première loi [16h] car le compteur
+    // compte à zéro... mais la deuxième loi [24h] s'additionne quand même ».
+    var cumulative4 = 0;  // compteur de la règle du 16h — reset dès 4h de repos consécutives
+    var cumulative8 = 0;  // compteur de la règle du 24h — reset seulement à 8h de repos consécutives
     var rowsData = [];
     var hasError = false;
 
@@ -964,14 +970,23 @@
       var rowError = workError || restError;
       if (rowError) hasError = true;
 
-      var resetted = restMin !== null && restMin >= 8 * 60;
-      if (resetted || (idx === 0 && restMin === null)) {
-        cumulative = workMin || 0;
+      var isFirstNoRest = idx === 0 && restMin === null;
+      var reset4 = restMin !== null && restMin >= 4 * 60;
+      var reset8 = restMin !== null && restMin >= 8 * 60;
+
+      if (reset4 || isFirstNoRest) {
+        cumulative4 = workMin || 0;
       } else {
-        cumulative = (restMin !== null && restMin >= 8 * 60 ? 0 : cumulative) + (workMin || 0);
+        cumulative4 = cumulative4 + (workMin || 0);
       }
 
-      rowsData.push({ workMin: workMin, restMin: restMin, cumulative: cumulative, error: rowError, workError: workError, restError: restError });
+      if (reset8 || isFirstNoRest) {
+        cumulative8 = workMin || 0;
+      } else {
+        cumulative8 = cumulative8 + (workMin || 0);
+      }
+
+      rowsData.push({ workMin: workMin, restMin: restMin, cumulative: cumulative8, cumulative4: cumulative4, cumulative8: cumulative8, error: rowError, workError: workError, restError: restError });
       if (workEndD) prevActivityEndD = workEndD;
     });
 
@@ -1061,7 +1076,8 @@
     }
 
     var last = rowsData[rowsData.length - 1];
-    var cumul = last.cumulative;
+    var cumul4 = last.cumulative4;
+    var cumul8 = last.cumulative8;
     var nowD = toDate(document.getElementById("nowTimeDate").value, document.getElementById("nowTime").value);
     var restSinceLast = (nowD && lastActivityEndD) ? diffMinutes(lastActivityEndD, nowD) : 0;
     if (restSinceLast !== null && restSinceLast < 0) {
@@ -1076,53 +1092,71 @@
     }
 
     var effectiveRest = restSinceLast || 0;
-    var totalContinu = cumul + (effectiveRest < 4 * 60 ? effectiveRest : 0);
+    // Le repos en cours (pas encore confirmé par une nouvelle activité) ne
+    // s'ajoute au cumul que tant qu'il n'a pas atteint 4h — au-delà, on
+    // considère qu'un repos qualifiant est en cours et le cumul reste figé
+    // (il ne sera remis à zéro dans les lignes qu'une fois l'activité
+    // suivante consignée, via computeRows).
+    var totalContinu4 = cumul4 + (effectiveRest < 4 * 60 ? effectiveRest : 0); // base règle du 16 h (art. 4.4)
+    var totalContinu8 = cumul8 + (effectiveRest < 4 * 60 ? effectiveRest : 0); // base règle du 24 h (art. 4.5)
     var state = "ok";
     var restOk4 = effectiveRest >= 4 * 60;
     var restOk8 = effectiveRest >= 8 * 60;
+    var displayTotal = totalContinu8;
 
     if (restOk8) {
       state = "ok";
       msg.textContent = "Vous êtes en repos suffisant (8 h+) — le compteur est à zéro";
       detail.textContent = "Aucune démarche à faire pour l'instant. Le calcul reprendra à votre prochaine activité.";
+      displayTotal = 0;
     } else {
-      var effectiveCumul = totalContinu;
-      if (effectiveCumul >= 24 * 60) {
+      if (totalContinu8 >= 24 * 60) {
         state = "crit";
         msg.textContent = "24e heure atteinte — non-disponibilité obligatoire (règle du 24 h)";
         detail.textContent = "Appelez le superviseur de garde immédiatement (art. 4.5).";
-      } else if (effectiveCumul >= 17 * 60 && !restOk8) {
-        state = "soon";
-        msg.textContent = "Admissible dès maintenant à la règle du 24 h";
-        detail.textContent = "Vous pouvez appeler le superviseur de garde pour demander votre non-disponibilité (art. 4.5).";
-      } else if (effectiveCumul >= 16 * 60 && !restOk4) {
+        displayTotal = totalContinu8;
+      } else if (totalContinu4 >= 16 * 60 && !restOk4) {
+        // IMPORTANT : ce seuil (16h, obligatoire) doit être vérifié AVANT le seuil
+        // de 17h (ci-dessous, optionnel) — sinon le statut "redescend" à tort de
+        // "obligatoire" à "admissible" entre 17h et 24h de travail continu sans
+        // aucun repos, ce qui sous-affiche l'urgence réelle de la situation.
         state = "crit";
         msg.textContent = "16e heure atteinte — non-disponibilité obligatoire (règle du 16 h)";
         detail.textContent = "Appelez le superviseur de garde immédiatement (art. 4.4).";
-      } else if (effectiveCumul >= 12 * 60 && !restOk4) {
+        displayTotal = totalContinu4;
+      } else if (totalContinu8 >= 17 * 60 && !restOk8) {
+        state = "soon";
+        msg.textContent = "Admissible dès maintenant à la règle du 24 h";
+        detail.textContent = "Vous pouvez appeler le superviseur de garde pour demander votre non-disponibilité (art. 4.5).";
+        displayTotal = totalContinu8;
+      } else if (totalContinu4 >= 12 * 60 && !restOk4) {
         state = "soon";
         msg.textContent = "Admissible dès maintenant à la règle du 16 h";
         detail.textContent = "Vous pouvez appeler le superviseur de garde pour demander votre non-disponibilité (art. 4.4).";
-      } else if (effectiveCumul >= 14 * 60 && !restOk8) {
+        displayTotal = totalContinu4;
+      } else if (totalContinu8 >= 14 * 60 && !restOk8) {
         state = "watch";
         msg.textContent = "Approche de la règle du 24 h — à surveiller";
         detail.textContent = "Vous n'êtes pas encore qualifié. Informez le superviseur de garde de la situation dès maintenant (art. 4.5).";
-      } else if (effectiveCumul >= 10 * 60 && !restOk4) {
+        displayTotal = totalContinu8;
+      } else if (totalContinu4 >= 10 * 60 && !restOk4) {
         state = "watch";
         msg.textContent = "Approche de la règle du 16 h — à surveiller";
         detail.textContent = "Vous n'êtes pas encore qualifié. Informez le superviseur de garde de la situation dès maintenant (art. 4.4).";
+        displayTotal = totalContinu4;
       } else {
         state = "ok";
         msg.textContent = "Sous les seuils — aucune démarche requise";
         detail.textContent = "Continuez à consigner vos activités; l'outil vous avertira à l'approche d'un seuil.";
+        displayTotal = Math.max(totalContinu4, totalContinu8);
       }
     }
 
     resultEl.className = "result " + state;
-    cumulValueEl.textContent = fmtHM(totalContinu);
+    cumulValueEl.textContent = fmtHM(displayTotal);
     label.textContent = restSinceLast ? "Repos en cours : " + fmtHM(restSinceLast) : "Statut";
 
-    lastComputed = { state: state, msg: msg.textContent, detail: detail.textContent, totalContinu: totalContinu, restSinceLast: restSinceLast };
+    lastComputed = { state: state, msg: msg.textContent, detail: detail.textContent, totalContinu: displayTotal, totalContinu4: totalContinu4, totalContinu8: totalContinu8, restSinceLast: restSinceLast };
     updateEmailPreview();
   }
 
