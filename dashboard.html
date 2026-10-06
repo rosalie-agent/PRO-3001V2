@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tableau de bord PROOPE011 — Ambulance Chicoutimi SLN</title>
+<style>
+  :root {
+    --bg: #eef2f7;
+    --card: #ffffff;
+    --navy: #0b3d78;
+    --text: #1c2630;
+    --sub: #5b6b7c;
+    --border: #d7dee6;
+    --ok-bg: #e4f6ea; --ok-fg: #1e7a3d; --ok-dot: #2fa860;
+    --watch-bg: #fff7e0; --watch-fg: #8a6500; --watch-dot: #e0a700;
+    --soon-bg: #ffe9d6; --soon-fg: #9a4a00; --soon-dot: #f07d1e;
+    --crit-bg: #fde2e2; --crit-fg: #a31212; --crit-dot: #e03b3b;
+    --none-bg: #eef1f4; --none-fg: #5b6b7c; --none-dot: #9aa7b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .topbar {
+    background: var(--navy);
+    color: #fff;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .topbar h1 { font-size: 17px; margin: 0; font-weight: 700; }
+  .topbar .sub { font-size: 12px; opacity: 0.85; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 18px 16px 60px; }
+
+  /* ---------- écran de connexion ---------- */
+  #loginScreen {
+    max-width: 380px;
+    margin: 60px auto;
+    background: var(--card);
+    border-radius: 14px;
+    padding: 28px 24px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  #loginScreen h2 { margin-top: 0; font-size: 18px; }
+  #loginScreen label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 6px; }
+  #loginScreen input[type="password"] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 15px; margin-bottom: 14px;
+  }
+  #loginScreen button {
+    width: 100%; padding: 11px; border: none; border-radius: 8px; background: var(--navy);
+    color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  #loginScreen button:hover { background: #0a3666; }
+  #loginError { color: var(--crit-fg); font-size: 13px; margin-top: 10px; display: none; }
+
+  /* ---------- grille des véhicules ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .vcard {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    border-left: 6px solid var(--none-dot);
+  }
+  .vcard.ok { border-left-color: var(--ok-dot); }
+  .vcard.watch { border-left-color: var(--watch-dot); }
+  .vcard.soon { border-left-color: var(--soon-dot); }
+  .vcard.crit { border-left-color: var(--crit-dot); }
+  .vcard-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .vcard-unit { font-size: 18px; font-weight: 700; }
+  .vcard-sector { font-size: 12px; color: var(--sub); }
+  .vcard-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 999px; margin: 8px 0 6px;
+  }
+  .vcard-status.ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .vcard-status.watch { background: var(--watch-bg); color: var(--watch-fg); }
+  .vcard-status.soon { background: var(--soon-bg); color: var(--soon-fg); }
+  .vcard-status.crit { background: var(--crit-bg); color: var(--crit-fg); }
+  .vcard-status.none { background: var(--none-bg); color: var(--none-fg); }
+  .vcard-msg { font-size: 13.5px; margin: 4px 0; }
+  .vcard-meta { font-size: 12px; color: var(--sub); margin-top: 8px; display: flex; justify-content: space-between; }
+  .vcard-updated { font-size: 11px; color: var(--sub); margin-top: 6px; }
+  .vcard.stale { opacity: 0.55; }
+  .vcard-detail-btn {
+    margin-top: 10px; font-size: 12.5px; background: none; border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; cursor: pointer; color: var(--navy);
+  }
+  .empty-state { text-align: center; color: var(--sub); padding: 60px 20px; font-size: 14px; }
+
+  /* ---------- panneau détail (direction) ---------- */
+  #detailPanel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100vw);
+    background: var(--card); box-shadow: -2px 0 12px rgba(0,0,0,0.15);
+    transform: translateX(100%); transition: transform 0.2s ease;
+    overflow-y: auto; z-index: 50; padding: 20px;
+  }
+  #detailPanel.open { transform: translateX(0); }
+  #detailPanel h3 { margin-top: 0; }
+  #detailPanel .close-btn { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 20px; cursor: pointer; }
+  .hist-item { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 13px; }
+  .act-row { font-size: 12.5px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--sub); margin-top: 18px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+  #logoutBar { text-align: right; margin-bottom: -6px; }
+  #logoutBar button { background: none; border: none; color: #cfe0f5; font-size: 12.5px; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h2>Tableau de bord PROOPE011</h2>
+  <p style="font-size:13px;color:var(--sub);">Ambulance Chicoutimi SLN — accès réservé à la direction et aux répartiteurs.</p>
+  <label for="pwInput">Mot de passe</label>
+  <input type="password" id="pwInput" placeholder="•••••••••">
+  <button id="loginBtn" type="button">Entrer</button>
+  <div id="loginError">Mot de passe incorrect.</div>
+</div>
+
+<div id="dashboardScreen" style="display:none;">
+  <div class="topbar">
+    <div>
+      <h1 id="topTitle">Tableau de bord PROOPE011</h1>
+      <div class="sub">Ambulance Chicoutimi SLN — suivi en direct des véhicules en faction</div>
+    </div>
+    <div id="logoutBar"><button id="logoutBtn" type="button">Déconnexion</button></div>
+  </div>
+  <div class="wrap">
+    <div id="grid" class="grid"></div>
+    <div class="legend">
+      <span><i style="background:var(--ok-dot)"></i>Sous les seuils</span>
+      <span><i style="background:var(--watch-dot)"></i>À surveiller</span>
+      <span><i style="background:var(--soon-dot)"></i>Admissible (optionnel)</span>
+      <span><i style="background:var(--crit-dot)"></i>Obligatoire</span>
+      <span><i style="background:var(--none-dot)"></i>Pas de quart actif / aucune donnée récente</span>
+    </div>
+  </div>
+</div>
+
+<div id="detailPanel">
+  <button class="close-btn" id="closeDetailBtn" type="button">✕</button>
+  <div id="detailContent"></div>
+</div>
+
+<!-- SDK Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  // =====================================================================
+  // CONFIGURATION — à remplir par Rose (voir le guide fourni par Claude)
+  // =====================================================================
+
+  // 1) Même config Firebase que dans index.html (la config n'est pas un secret —
+  //    elle identifie simplement le projet, la vraie protection vient des règles
+  //    Firestore et des mots de passe ci-dessous).
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDYnY22y-kIMt6MQ3g-3sNESzEE65AaufY",
+    authDomain: "pro-3001-chicoutimi.firebaseapp.com",
+    projectId: "pro-3001-chicoutimi",
+    storageBucket: "pro-3001-chicoutimi.firebasestorage.app",
+    messagingSenderId: "858027894732",
+    appId: "1:858027894732:web:8ebba662ba9ded26811f69"
+  };
+
+  // 2) Mots de passe d'accès. ATTENTION — voir l'avertissement de sécurité dans le
+  //    guide : ce n'est qu'une barrière simple côté client, pas une vraie
+  //    protection contre quelqu'un de déterminé qui aurait le lien. Ne pas y
+  //    mettre de données plus sensibles que le statut de travail des véhicules.
+  var PASSWORDS = {
+    "Adminambuchic-sln": "direction",
+    "Ccscapitales.ambuchic-sln": "repartiteurs"
+  };
+
+  // Combien de temps avant qu'une fiche véhicule soit considérée "ancienne"
+  // (pas mise à jour récemment — grisée, pour éviter d'afficher un statut
+  // périmé comme si c'était la situation actuelle).
+  var STALE_AFTER_MIN = 45;
+
+  // =====================================================================
+
+  var role = null; // "direction" ou "repartiteurs"
+  var db = null;
+  var vehicleDocs = {}; // unitId -> dernières données reçues
+
+  function $(id) { return document.getElementById(id); }
+
+  function initFirebase() {
+    if (!FIREBASE_CONFIG.apiKey || typeof firebase === "undefined") {
+      console.warn("Firebase non configuré — le tableau de bord ne peut pas afficher de données tant que FIREBASE_CONFIG n'est pas rempli.");
+      return false;
+    }
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      db = firebase.firestore();
+      return true;
+    } catch (e) {
+      console.error("Erreur d'initialisation Firebase :", e);
+      return false;
+    }
+  }
+
+  // ---------- connexion ----------
+  $("loginBtn").addEventListener("click", attemptLogin);
+  $("pwInput").addEventListener("keydown", function (e) { if (e.key === "Enter") attemptLogin(); });
+
+  function attemptLogin() {
+    var pw = $("pwInput").value;
+    if (PASSWORDS.hasOwnProperty(pw)) {
+      role = PASSWORDS[pw];
+      sessionStorage.setItem("proope011_dash_role", role);
+      enterDashboard();
+    } else {
+      $("loginError").style.display = "block";
+    }
+  }
+
+  $("logoutBtn").addEventListener("click", function () {
+    sessionStorage.removeItem("proope011_dash_role");
+    location.reload();
+  });
+
+  function enterDashboard() {
+    $("loginScreen").style.display = "none";
+    $("dashboardScreen").style.display = "block";
+    $("topTitle").textContent = role === "direction"
+      ? "Tableau de bord PROOPE011 — Direction"
+      : "Tableau de bord PROOPE011 — Répartiteurs";
+    if (initFirebase()) {
+      listenToVehicles();
+    } else {
+      $("grid").innerHTML = '<div class="empty-state">Synchronisation non configurée — voir FIREBASE_CONFIG dans le code de cette page.</div>';
+    }
+  }
+
+  // ---------- réception des données en direct ----------
+  function listenToVehicles() {
+    db.collection("vehicules").onSnapshot(function (snap) {
+      vehicleDocs = {};
+      snap.forEach(function (doc) { vehicleDocs[doc.id] = doc.data(); });
+      renderGrid();
+    }, function (err) {
+      console.error("Erreur de synchronisation :", err);
+      $("grid").innerHTML = '<div class="empty-state">Impossible de récupérer les données en direct. Vérifiez la connexion ou les règles Firestore.</div>';
+    });
+  }
+
+  function fmtHM(min) {
+    if (min === null || min === undefined || isNaN(min)) return "—";
+    var h = Math.floor(min / 60), m = Math.round(min % 60);
+    return h + "h" + (m < 10 ? "0" : "") + m;
+  }
+
+  function timeAgo(ts) {
+    if (!ts) return "jamais";
+    var ms = (ts.toMillis ? ts.toMillis() : new Date(ts).getTime());
+    var diffMin = Math.round((Date.now() - ms) / 60000);
+    if (diffMin < 1) return "à l'instant";
+    if (diffMin < 60) return diffMin + " min";
+    return Math.floor(diffMin / 60) + "h" + String(diffMin % 60).padStart(2, "0");
+  }
+
+  function isStale(ts) {
+    if (!ts) return true;
+    var ms = (ts.toMillis ? ts.toMillis() : new Date(ts).getTime());
+    return (Date.now() - ms) / 60000 > STALE_AFTER_MIN;
+  }
+
+  var STATE_LABEL = { ok: "Sous les seuils", watch: "À surveiller", soon: "Admissible", crit: "Obligatoire", none: "Aucune donnée" };
+
+  function renderGrid() {
+    var ids = Object.keys(vehicleDocs).sort();
+    var grid = $("grid");
+    if (!ids.length) {
+      grid.innerHTML = '<div class="empty-state">Aucun véhicule n\'a encore transmis de données.<br>Les fiches apparaîtront ici dès qu\'un TAP commence à remplir le PRO-3001 sur son téléphone.</div>';
+      return;
+    }
+    grid.innerHTML = "";
+    ids.forEach(function (id) {
+      var v = vehicleDocs[id];
+      var result = v.result || {};
+      var state = result.state || "none";
+      var stale = isStale(v.lastUpdated);
+      var card = document.createElement("div");
+      card.className = "vcard " + state + (stale ? " stale" : "");
+      card.innerHTML =
+        '<div class="vcard-head"><div class="vcard-unit">' + escapeHtml(id) + '</div><div class="vcard-sector">' + escapeHtml(v.sector || "") + '</div></div>' +
+        '<div class="vcard-status ' + state + '">' + STATE_LABEL[state] + (stale ? " · info ancienne" : "") + '</div>' +
+        '<div class="vcard-msg">' + escapeHtml(result.msg || "—") + '</div>' +
+        '<div class="vcard-meta"><span>Cumul : ' + fmtHM(result.totalContinu) + '</span><span>Repos en cours : ' + fmtHM(result.restSinceLast) + '</span></div>' +
+        '<div class="vcard-updated">Mis à jour il y a ' + timeAgo(v.lastUpdated) +
+          (role === "direction" && v.enteredBy ? ' · saisi par ' + escapeHtml(v.enteredBy.name) + ' (' + escapeHtml(v.enteredBy.matricule) + ')' : '') + '</div>' +
+        (role === "direction" ? '<button class="vcard-detail-btn" data-unit="' + escapeHtml(id) + '" type="button">Voir le détail et l\'historique</button>' : '');
+      grid.appendChild(card);
+    });
+    if (role === "direction") {
+      grid.querySelectorAll(".vcard-detail-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () { openDetail(btn.getAttribute("data-unit")); });
+      });
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // ---------- panneau détail + historique (direction uniquement) ----------
+  $("closeDetailBtn").addEventListener("click", function () { $("detailPanel").classList.remove("open"); });
+
+  function openDetail(unitId) {
+    var v = vehicleDocs[unitId] || {};
+    var acts = v.activities || [];
+    var html = '<h3>' + escapeHtml(unitId) + '</h3>';
+    html += '<p style="font-size:13px;color:var(--sub);">Secteur : ' + escapeHtml(v.sector || "—") +
+      '<br>Début de faction : ' + escapeHtml(v.factionStartDate || "—") + ' ' + escapeHtml(v.factionStart || "") + '</p>';
+    html += '<h4 style="margin-bottom:6px;">Activités du quart en cours</h4>';
+    if (!acts.length) {
+      html += '<p style="font-size:13px;color:var(--sub);">Aucune activité consignée.</p>';
+    } else {
+      acts.forEach(function (a, i) {
+        html += '<div class="act-row">#' + (i + 1) + ' — ' + escapeHtml(a.startDate) + ' ' + escapeHtml(a.start) +
+          ' → ' + escapeHtml(a.activityEndDate || a.callEndDate || "") + ' ' + escapeHtml(a.activityEnd || a.callEnd || "") + '</div>';
+      });
+    }
+    html += '<h4 style="margin:16px 0 6px;">Historique des quarts archivés</h4>';
+    html += '<div id="histList-' + escapeHtml(unitId) + '" style="font-size:13px;color:var(--sub);">Chargement…</div>';
+    $("detailContent").innerHTML = html;
+    $("detailPanel").classList.add("open");
+    loadHistory(unitId);
+  }
+
+  function loadHistory(unitId) {
+    var target = $("histList-" + unitId);
+    if (!db) return;
+    db.collection("vehicules").doc(unitId).collection("historique")
+      .orderBy("savedAt", "desc").limit(20).get()
+      .then(function (snap) {
+        if (snap.empty) { target.innerHTML = "Aucun quart archivé pour ce véhicule."; return; }
+        var html = "";
+        snap.forEach(function (doc) {
+          var h = doc.data();
+          var res = h.result || {};
+          html += '<div class="hist-item"><b>' + escapeHtml(h.factionStartDate || "") + ' ' + escapeHtml(h.factionStart || "") + '</b><br>' +
+            escapeHtml(res.msg || "—") + ' — cumul ' + fmtHM(res.totalContinu) + '<br>' +
+            '<span style="color:var(--sub);">Archivé le ' + escapeHtml((h.savedAt || "").slice(0, 16).replace("T", " à ")) +
+            (h.enteredBy ? ' · saisi par ' + escapeHtml(h.enteredBy.name) + ' (' + escapeHtml(h.enteredBy.matricule) + ')' : '') + '</span></div>';
+        });
+        target.innerHTML = html;
+      })
+      .catch(function (e) {
+        target.innerHTML = "Erreur de chargement de l'historique.";
+        console.error(e);
+      });
+  }
+
+  // ---------- reprise de session (évite de retaper le mot de passe à chaque rafraîchissement) ----------
+  var savedRole = sessionStorage.getItem("proope011_dash_role");
+  if (savedRole && PASSWORDS_VALUES_INCLUDE(savedRole)) {
+    role = savedRole;
+    enterDashboard();
+  }
+  function PASSWORDS_VALUES_INCLUDE(r) {
+    for (var k in PASSWORDS) { if (PASSWORDS[k] === r) return true; }
+    return false;
+  }
+})();
+</script>
+</body>
+</html>

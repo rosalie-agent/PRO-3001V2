@@ -660,13 +660,35 @@
     margin-top: 8px;
   }
 </style>
+<!-- Synchronisation cloud (optionnelle) pour le tableau de bord des répartiteurs/direction.
+     Chargés depuis le CDN Google — si le téléphone est hors ligne, ces deux scripts échouent
+     silencieusement et l'outil continue de fonctionner normalement en local, juste sans
+     synchronisation tant que le réseau n'est pas revenu. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
+
+<!-- ===================== ÉCRAN DE VERROUILLAGE (code TAP) ===================== -->
+<div id="tapLockScreen" style="display:none; position:fixed; inset:0; background:#eef2f7; z-index:200; align-items:center; justify-content:center; padding:20px;">
+  <div style="max-width:360px; width:100%; background:#fff; border-radius:14px; padding:26px 22px; box-shadow:0 2px 10px rgba(0,0,0,0.1);">
+    <div style="font-weight:700; font-size:17px; margin-bottom:4px;">Identification requise</div>
+    <p style="font-size:13px; color:#5b6b7c; margin-top:0;">Entrez votre numéro d'employé pour utiliser l'outil PROOPE011. Ça permet d'assurer le suivi de la qualité des données saisies.</p>
+    <label for="tapCodeInput" style="display:block; font-size:13px; color:#5b6b7c; margin-bottom:6px;">Numéro d'employé</label>
+    <input type="text" id="tapCodeInput" inputmode="numeric" placeholder="ex. 4821" style="width:100%; padding:10px 12px; border:1px solid #d7dee6; border-radius:8px; font-size:16px; margin-bottom:12px;">
+    <button id="tapCodeBtn" type="button" style="width:100%; padding:11px; border:none; border-radius:8px; background:#0b3d78; color:#fff; font-size:15px; font-weight:600; cursor:pointer;">Confirmer</button>
+    <div id="tapCodeError" style="display:none; color:#a31212; font-size:13px; margin-top:10px;">Numéro d'employé non reconnu — vérifiez auprès de votre superviseur.</div>
+  </div>
+</div>
 
 <div class="brandbar">
   <div class="brandrow">
     <div class="brandtext">Ambulance Chicoutimi SLN</div>
     <div class="brandsub">PROOPE011</div>
+  </div>
+  <div id="tapIdentityBar" style="display:none; font-size:12px; color:#cfe0f5; padding:4px 0 0; display:flex; justify-content:space-between; align-items:center;">
+    <span>Connecté : <b id="tapIdentityName" style="color:#fff;">—</b></span>
+    <button id="tapChangeBtn" type="button" style="background:none; border:none; color:#cfe0f5; font-size:12px; text-decoration:underline; cursor:pointer; padding:0;">Changer de TAP</button>
   </div>
 </div>
 
@@ -722,8 +744,17 @@
       </div>
       <div class="field-row">
         <div>
-          <label for="unitId">Numéro d'équipe / véhicule</label>
-          <input type="text" id="unitId" placeholder="ex. 3627 PDC">
+          <label for="unitIdSelect">Numéro d'équipe / véhicule</label>
+          <select id="unitIdSelect">
+            <option value="">— Choisir —</option>
+            <option value="3706">3706 (Chibougamau)</option>
+            <option value="3707">3707 (Chibougamau)</option>
+            <option value="3711">3711 (Chapais)</option>
+            <option value="3696">3696 (Parc de Chibougamau)</option>
+            <option value="3672">3672 (véhicule de remplacement)</option>
+            <option value="__autre__">Autre…</option>
+          </select>
+          <input type="text" id="unitId" placeholder="ex. 3627 PDC" style="display:none; margin-top:6px;">
         </div>
         <div>
           <label for="sector">Secteur</label>
@@ -818,6 +849,218 @@
   var STORAGE_STATE = "proope011_state_v1";
   var STORAGE_HISTORY = "proope011_history_v1";
   var STORAGE_SEEDED = "proope011_seeded_v1";
+
+  // ---------- synchronisation cloud (tableau de bord répartiteurs / direction) ----------
+  // IMPORTANT : tant que FIREBASE_CONFIG.apiKey reste vide, cette section ne fait RIEN —
+  // l'outil continue de fonctionner exactement comme avant, 100 % local sur l'appareil.
+  // Pour activer la synchronisation : créer un projet Firebase gratuit (voir le guide fourni
+  // par Claude) et remplir les valeurs ci-dessous avec la config qu'il vous donne.
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDYnY22y-kIMt6MQ3g-3sNESzEE65AaufY",
+    authDomain: "pro-3001-chicoutimi.firebaseapp.com",
+    projectId: "pro-3001-chicoutimi",
+    storageBucket: "pro-3001-chicoutimi.firebasestorage.app",
+    messagingSenderId: "858027894732",
+    appId: "1:858027894732:web:8ebba662ba9ded26811f69"
+  };
+
+  var cloudDb = null;
+  (function initCloud() {
+    if (!FIREBASE_CONFIG.apiKey || typeof firebase === "undefined") return;
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      cloudDb = firebase.firestore();
+    } catch (e) { console.warn("Synchronisation cloud non initialisée :", e); }
+  })();
+
+  var cloudPushTimer = null;
+  function pushLiveStatusToCloud(shiftMeta) {
+    if (!cloudDb || !shiftMeta.unitId) return;
+    clearTimeout(cloudPushTimer);
+    cloudPushTimer = setTimeout(function () {
+      cloudDb.collection("vehicules").doc(shiftMeta.unitId).set({
+        unitId: shiftMeta.unitId,
+        sector: shiftMeta.sector,
+        factionStartDate: shiftMeta.factionStartDate,
+        factionStart: shiftMeta.factionStart,
+        activities: shiftMeta.activities,
+        result: lastComputed ? {
+          state: lastComputed.state,
+          msg: lastComputed.msg,
+          detail: lastComputed.detail,
+          totalContinu: lastComputed.totalContinu,
+          totalContinu4: lastComputed.totalContinu4,
+          totalContinu8: lastComputed.totalContinu8,
+          restSinceLast: lastComputed.restSinceLast
+        } : null,
+        enteredBy: getTapSession() ? { matricule: getTapSession().matricule, name: getTapSession().name } : null,
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(function (e) { console.warn("Synchronisation cloud échouée (pas de réseau ?) :", e); });
+    }, 600); // léger délai pour ne pas envoyer une requête à chaque frappe de clavier
+  }
+
+  function pushArchiveToCloud(entry) {
+    if (!cloudDb || !entry.unitId) return;
+    var tap = getTapSession();
+    entry = Object.assign({}, entry, { enteredBy: tap ? { matricule: tap.matricule, name: tap.name } : null });
+    cloudDb.collection("vehicules").doc(entry.unitId).collection("historique").doc(entry.id).set(entry)
+      .catch(function (e) { console.warn("Archivage cloud échoué (pas de réseau ?) :", e); });
+  }
+
+  // ---------- identification du TAP (code employé) ----------
+  // IMPORTANT : liste à tenir à jour par Rose — matricule (lettre + numéro) -> nom.
+  // Ceci sert UNIQUEMENT à l'assurance qualité interne (savoir qui a consigné quoi),
+  // ce n'est pas un système de mots de passe sécurisés — n'y mettez pas d'autre
+  // information que le nom associé au matricule.
+  var TAP_CODES = {
+    "H0133": "Stéphane Hamel",
+    "H0353": "Rosalie Hamel",
+    "H0360": "Louis-Antoine Hamel",
+    "A0192": "Valérie Aubin",
+    "A0250": "Marc-André Anctil",
+    "B0781": "Michel Biron",
+    "B0968": "Marco Bélanger",
+    "B0990": "Danny Bérubé",
+    "B1039": "Jonathan Bouchard",
+    "B1090": "Steven Boudreault",
+    "B1355": "Régis Bouchard",
+    "B1511": "Benoit Boulianne",
+    "B1615": "Éric Bergeron",
+    "B1696": "Rémy-Pierre Boily",
+    "B1927": "Amélia Bouchard",
+    "B1938": "Emily Bernier",
+    "B1980": "Marco Boulay",
+    "B1981": "Justine Bélanger",
+    "B2109": "Océane Bilodeau",
+    "C0526": "Richard Côté",
+    "C1159": "Dao Chayer",
+    "C1275": "Coralie Côté",
+    "C1341": "Ely-Ann Couture",
+    "D0488": "Sylvain Duchesne",
+    "D0626": "Marie-Josée Després",
+    "D0892": "Émilie D'Amboise",
+    "D1009": "Véronique Dionne L'Heureux",
+    "D1176": "Joanie Dallaire",
+    "D1287": "Clara Drouin",
+    "D1349": "Jade Desrosiers",
+    "D1350": "Valérie Desbiens",
+    "D1385": "Alicia Desmeules",
+    "D1386": "Maryanne Dumas",
+    "D1439": "Arianne Dion",
+    "F0382": "Véronique Foster",
+    "F0477": "Marie-Michelle Fortin",
+    "F0555": "Christopher Fleury-Bélanger",
+    "F0563": "Megan Fortin",
+    "F0573": "Alex Frigon",
+    "G0386": "Donald Gauthier",
+    "G0635": "Robert Gallant",
+    "G0873": "Sarah Guimond",
+    "G0944": "Isabelle Gaudreault",
+    "G0972": "Jean-Philippe Gauthier",
+    "G1278": "William Guérin",
+    "G1285": "Karolane Guilbeault",
+    "G1354": "Noémie Girard",
+    "J0154": "Jérôme Jacques",
+    "L0818": "Alain Larouche",
+    "L1034": "Chantale Lavoie",
+    "L1182": "Jean-Philippe Larouche",
+    "L1356": "Éric Lavoie",
+    "L1372": "Éric Leblanc",
+    "L1375": "Michel Leblanc",
+    "L1481": "Carole-Ann Lachance-Lapierre",
+    "L1540": "Jimmy Levesque",
+    "L1605": "Sabrina Lapointe",
+    "L2057": "Marc-André Lachapelle",
+    "M0465": "Evans Moreau",
+    "M0510": "Pascal Munger",
+    "M0683": "Philippe Morissette",
+    "M0716": "Simon Maltais",
+    "M1102": "Rosemarie Maltais",
+    "M1166": "William Malenfant",
+    "P0620": "Pierre-Alexandre Perron",
+    "P0752": "Pascal Potvin",
+    "P1004": "Judith Parent",
+    "P1039": "Tommy Potvin",
+    "P1092": "Olivier Parise",
+    "P1093": "Gabrielle Picard",
+    "P1186": "Maude Pichette",
+    "R0398": "Pierre Roy",
+    "R0703": "Josianne Ruelland",
+    "R0850": "Maxime Roy",
+    "S0595": "Alain Simard",
+    "S0651": "Roxanne St-Gelais-Lapointe",
+    "S0706": "Anna-Corine St-Gelais",
+    "S0729": "Élisabeth Simard",
+    "S0754": "Raphaël Simard",
+    "T0282": "Carol Tremblay",
+    "T0380": "Carl Trépanier",
+    "T0933": "Daniel Tremblay",
+    "T0937": "Pierre-Alexandre Tremblay",
+    "T0946": "Donald Tremblay",
+    "T0973": "Daniel Toulouse",
+    "T0984": "Mathieu Thibeault",
+    "T1105": "Nicolas Tremblay",
+    "T1188": "Marylou Tremblay",
+    "T1219": "Zachary Tremblay",
+    "V0232": "Joannie Venne",
+    "V0237": "Marc Villeneuve",
+    "V0353": "Raphaëlle Vachon"
+    // Remarque de Claude : j'ai exclu de cette liste quelques lignes de la photo qui
+    // ne ressemblaient pas à de vrais matricules de TAP (57 VACANT POSTE, 12/15 BTAQ,
+    // [100]/[102]/[9700]) — à confirmer avec Rose si l'une d'elles doit être ajoutée.
+  };
+
+  var STORAGE_TAP_SESSION = "proope011_tap_session_v1";
+  var TAP_SESSION_DAYS = 7;
+
+  function getTapSession() {
+    var s = loadJSON(STORAGE_TAP_SESSION, null);
+    if (!s || !s.loginAt) return null;
+    var ageMs = Date.now() - new Date(s.loginAt).getTime();
+    if (ageMs > TAP_SESSION_DAYS * 24 * 60 * 60 * 1000) return null; // expiré après 7 jours
+    return s;
+  }
+
+  function setTapSession(matricule, name) {
+    saveJSON(STORAGE_TAP_SESSION, { matricule: matricule, name: name, loginAt: new Date().toISOString() });
+  }
+
+  function clearTapSession() {
+    try { localStorage.removeItem(STORAGE_TAP_SESSION); } catch (e) {}
+  }
+
+  function updateTapIdentityBar() {
+    var s = getTapSession();
+    var bar = document.getElementById("tapIdentityBar");
+    if (s) {
+      bar.style.display = "flex";
+      document.getElementById("tapIdentityName").textContent = s.name + " (" + s.matricule + ")";
+    } else {
+      bar.style.display = "none";
+    }
+  }
+
+  function showTapLock() {
+    document.getElementById("tapLockScreen").style.display = "flex";
+    document.getElementById("tapCodeInput").value = "";
+    document.getElementById("tapCodeError").style.display = "none";
+    setTimeout(function () { document.getElementById("tapCodeInput").focus(); }, 50);
+  }
+
+  function hideTapLock() {
+    document.getElementById("tapLockScreen").style.display = "none";
+  }
+
+  function attemptTapLogin() {
+    var raw = document.getElementById("tapCodeInput").value.trim().toUpperCase();
+    if (TAP_CODES.hasOwnProperty(raw)) {
+      setTapSession(raw, TAP_CODES[raw]);
+      updateTapIdentityBar();
+      hideTapLock();
+    } else {
+      document.getElementById("tapCodeError").style.display = "block";
+    }
+  }
 
   // ---------- stockage local (par appareil) ----------
   function loadJSON(key, fallback) {
@@ -1042,6 +1285,7 @@
 
     computeResult(calc.rowsData, calc.lastActivityEndD, calc.hasError);
     persistCurrentState();
+    pushLiveStatusToCloud({ unitId: document.getElementById("unitId").value, sector: document.getElementById("sector").value, factionStartDate: factionStartDate, factionStart: factionStart, activities: activities });
   }
 
   var lastComputed = null;
@@ -1287,6 +1531,7 @@
     var hist = getHistory();
     hist.unshift(entry);
     setHistory(hist);
+    pushArchiveToCloud(entry);
     return entry;
   }
 
@@ -1403,10 +1648,18 @@
     isExampleData = false;
     activities = [];
     document.getElementById("unitId").value = "";
+    syncUnitSelectFromValue("");
     document.getElementById("sector").value = "";
     document.getElementById("factionStartDate").value = isoDate(new Date());
     document.getElementById("factionStart").value = isoTime(new Date());
     render();
+
+    var nouvelleEquipe = confirm("Est-ce une nouvelle équipe qui prend ce véhicule ? (Oui = la prochaine personne devra entrer son numéro d'employé)");
+    if (nouvelleEquipe) {
+      clearTapSession();
+      updateTapIdentityBar();
+      showTapLock();
+    }
   });
 
   // ---------- onglets ----------
@@ -1453,8 +1706,40 @@
     });
   });
 
+  // ---------- liste déroulante des véhicules (#unitIdSelect) <-> champ réel #unitId ----------
+  var KNOWN_UNIT_IDS = ["3706", "3707", "3711", "3696", "3672"];
+  var unitIdSelect = document.getElementById("unitIdSelect");
+  var unitIdInput = document.getElementById("unitId");
+
+  function syncUnitSelectFromValue(val) {
+    if (val && KNOWN_UNIT_IDS.indexOf(val) !== -1) {
+      unitIdSelect.value = val;
+      unitIdInput.style.display = "none";
+    } else if (val) {
+      unitIdSelect.value = "__autre__";
+      unitIdInput.style.display = "";
+    } else {
+      unitIdSelect.value = "";
+      unitIdInput.style.display = "none";
+    }
+  }
+
+  unitIdSelect.addEventListener("change", function () {
+    if (unitIdSelect.value === "__autre__") {
+      unitIdInput.style.display = "";
+      unitIdInput.value = "";
+      unitIdInput.focus();
+    } else {
+      unitIdInput.style.display = "none";
+      unitIdInput.value = unitIdSelect.value;
+    }
+    isExampleData = false;
+    render();
+  });
+
   // ---------- initialisation ----------
   document.getElementById("unitId").value = initial.unitId || "";
+  syncUnitSelectFromValue(initial.unitId || "");
   document.getElementById("sector").value = initial.sector || "";
   document.getElementById("factionStartDate").value = initial.factionStartDate || "";
   document.getElementById("factionStart").value = initial.factionStart || "08:00";
@@ -1466,6 +1751,26 @@
 
   updateHistCount();
   render();
+
+  // ---------- identification TAP : branchement des événements + vérification au chargement ----------
+  document.getElementById("tapCodeBtn").addEventListener("click", attemptTapLogin);
+  document.getElementById("tapCodeInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") attemptTapLogin();
+  });
+  document.getElementById("tapChangeBtn").addEventListener("click", function () {
+    var ok = confirm("Changer de TAP ? La personne suivante devra entrer son propre numéro d'employé.");
+    if (ok) {
+      clearTapSession();
+      updateTapIdentityBar();
+      showTapLock();
+    }
+  });
+
+  if (getTapSession()) {
+    updateTapIdentityBar();
+  } else {
+    showTapLock();
+  }
 })();
 </script>
 
