@@ -1153,6 +1153,12 @@
   var activities = [];
   var isExampleData = false;
 
+  function escapeAttr(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
   function isoDate(d) {
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
@@ -1160,11 +1166,12 @@
     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
 
-  function newActivity(startDate, start, callEndDate, callEnd, activityEndDate, activityEnd) {
+  function newActivity(startDate, start, callEndDate, callEnd, activityEndDate, activityEnd, description) {
     return {
       startDate: startDate || "", start: start || "",
       callEndDate: callEndDate || "", callEnd: callEnd || "",
-      activityEndDate: activityEndDate || "", activityEnd: activityEnd || ""
+      activityEndDate: activityEndDate || "", activityEnd: activityEnd || "",
+      description: description || ""
     };
   }
 
@@ -1176,9 +1183,9 @@
       factionStartDate: yISO,
       factionStart: "08:00",
       activities: [
-        newActivity(yISO, "08:00", "", "", yISO, "08:15"),
-        newActivity(yISO, "09:00", yISO, "11:00", yISO, "11:30"),
-        newActivity(yISO, "22:00", tISO, "00:20", tISO, "00:45")
+        newActivity(yISO, "08:00", "", "", yISO, "08:15", "Vérification du véhicule"),
+        newActivity(yISO, "09:00", yISO, "11:00", yISO, "11:30", "Appel #48213"),
+        newActivity(yISO, "22:00", tISO, "00:20", tISO, "00:45", "Appel #48299 — redéploiement poste Chapais")
       ]
     };
   }
@@ -1306,6 +1313,20 @@
   }
 
   function render() {
+    // Préserve le focus et la position du curseur : listEl est entièrement
+    // reconstruit à chaque frappe (ex. dans le champ "Référence"), ce qui
+    // sinon ferait perdre le focus après chaque caractère tapé.
+    var active = document.activeElement;
+    var restoreFocus = null;
+    if (active && listEl.contains(active)) {
+      restoreFocus = {
+        idx: active.getAttribute("data-idx"),
+        field: active.getAttribute("data-field"),
+        selStart: (typeof active.selectionStart === "number") ? active.selectionStart : null,
+        selEnd: (typeof active.selectionEnd === "number") ? active.selectionEnd : null
+      };
+    }
+
     listEl.innerHTML = "";
     exampleFlag.style.display = isExampleData ? "inline-block" : "none";
 
@@ -1342,6 +1363,10 @@
             '<input type="date" data-idx="' + idx + '" data-field="activityEndDate" value="' + act.activityEndDate + '">' +
             '<input type="time" data-idx="' + idx + '" data-field="activityEnd" value="' + act.activityEnd + '"></div></div>' +
         '</div>' +
+        '<div class="field-row" style="grid-template-columns:1fr;">' +
+          '<div><label>Référence / justification (optionnel)</label>' +
+            '<input type="text" data-idx="' + idx + '" data-field="description" placeholder="Ex. : appel #12345, redéploiement poste Chapais, pause repas…" value="' + escapeAttr(act.description || "") + '"></div>' +
+        '</div>' +
         '<div class="activity-calc">' +
           (rd.workError
             ? '<span style="color:var(--crit-fg);font-weight:700;">La fin de cette activité précède son début — vérifiez la date de fin</span>'
@@ -1351,6 +1376,16 @@
         '</div>';
       listEl.appendChild(row);
     });
+
+    if (restoreFocus && restoreFocus.field) {
+      var toFocus = listEl.querySelector('[data-idx="' + restoreFocus.idx + '"][data-field="' + restoreFocus.field + '"]');
+      if (toFocus) {
+        toFocus.focus();
+        if (restoreFocus.selStart !== null && typeof toFocus.setSelectionRange === "function") {
+          try { toFocus.setSelectionRange(restoreFocus.selStart, restoreFocus.selEnd); } catch (e) {}
+        }
+      }
+    }
 
     computeResult(calc.rowsData, calc.lastActivityEndD, calc.hasError);
     persistCurrentState();
@@ -1595,7 +1630,7 @@
       factionStartDate: shiftMeta.factionStartDate,
       factionStart: shiftMeta.factionStart,
       activities: shiftMeta.activities,
-      result: lastComputed ? { state: lastComputed.state, msg: lastComputed.msg, detail: lastComputed.detail, totalContinu: lastComputed.totalContinu } : null
+      result: lastComputed ? { state: lastComputed.state, msg: lastComputed.msg, detail: lastComputed.detail, totalContinu: lastComputed.totalContinu, totalContinu4: lastComputed.totalContinu4, totalContinu8: lastComputed.totalContinu8 } : null
     };
     var hist = getHistory();
     hist.unshift(entry);

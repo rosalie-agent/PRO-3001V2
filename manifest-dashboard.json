@@ -1,0 +1,17 @@
+{
+  "name": "Suivi PROOPE011 — Direction / CCSC — Ambulance Chicoutimi",
+  "short_name": "Suivi 3001",
+  "description": "Tableau de bord de suivi en temps réel de la procédure PROOPE011 pour la direction et les répartiteurs (CCSC).",
+  "start_url": "./dashboard.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f3f4f6",
+  "theme_color": "#1f5a5c",
+  "lang": "fr-CA",
+  "icons": [
+    { "src": "icon-192-teal.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-teal.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable-teal.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

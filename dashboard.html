@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tableau de bord PROOPE011 — Ambulance Chicoutimi SLN</title>
+<link rel="manifest" href="manifest-dashboard.json">
+<link rel="icon" href="icon-192-teal.png">
+<link rel="apple-touch-icon" href="icon-192-teal.png">
+<meta name="theme-color" content="#1f5a5c">
 <style>
   :root {
     --bg: #f3f4f6;
@@ -71,8 +75,39 @@
   #loginScreen button:hover { background: var(--navy-dark); }
   #loginError { color: var(--crit-fg); font-size: 13px; margin-top: 12px; display: none; }
 
+  /* ---------- bandeau de synthèse ---------- */
+  .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 22px; }
+  .stat-tile {
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 14px; border-top: 3px solid var(--none-bar);
+  }
+  .stat-tile.ok { border-top-color: var(--ok-bar); }
+  .stat-tile.watch { border-top-color: var(--watch-bar); }
+  .stat-tile.soon { border-top-color: var(--soon-bar); }
+  .stat-tile.crit { border-top-color: var(--crit-bar); }
+  .stat-tile-count { font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1; }
+  .stat-tile-label { font-size: 11.5px; color: var(--sub); margin-top: 4px; letter-spacing: 0.01em; }
+  @media (max-width: 720px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+  .live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #5ad68f;
+    margin-right: 6px; box-shadow: 0 0 0 0 rgba(90,214,143,0.6);
+    animation: livepulse 2s infinite;
+  }
+  @keyframes livepulse {
+    0% { box-shadow: 0 0 0 0 rgba(90,214,143,0.55); }
+    70% { box-shadow: 0 0 0 6px rgba(90,214,143,0); }
+    100% { box-shadow: 0 0 0 0 rgba(90,214,143,0); }
+  }
+
   /* ---------- grille des véhicules ---------- */
   .section-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--sub); font-weight: 600; margin: 0 0 14px; }
+  .sector-heading {
+    font-size: 13px; font-weight: 700; color: var(--navy); margin: 26px 0 10px; padding-bottom: 6px;
+    border-bottom: 2px solid var(--border); display: flex; align-items: baseline; gap: 8px;
+  }
+  .sector-heading:first-of-type { margin-top: 0; }
+  .sector-heading-count { font-size: 11.5px; font-weight: 600; color: var(--sub); text-transform: none; }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
@@ -115,6 +150,19 @@
   .vcard-detail-link:hover { text-decoration: underline; }
   .empty-state { text-align: center; color: var(--sub); padding: 70px 20px; font-size: 14px; border: 1px dashed var(--border-strong); border-radius: 6px; }
 
+  .thresholds { margin-top: 10px; }
+  .thr-row { margin-bottom: 7px; }
+  .thr-row:last-child { margin-bottom: 0; }
+  .thr-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); margin-bottom: 3px; }
+  .thr-track { height: 6px; border-radius: 3px; background: var(--none-bg); overflow: hidden; }
+  .thr-fill { height: 100%; border-radius: 3px; background: var(--ok-bar); transition: width 0.3s ease; }
+  .thr-fill.watch { background: var(--watch-bar); }
+  .thr-fill.soon { background: var(--soon-bar); }
+  .thr-fill.crit { background: var(--crit-bar); }
+  .vcard-lastact { font-size: 12px; color: var(--sub); margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .vcard-lastact b { color: var(--ink); font-weight: 600; }
+  .act-desc { color: var(--sub); font-style: italic; }
+
   /* ---------- panneau détail ---------- */
   #detailOverlay {
     position: fixed; inset: 0; background: rgba(16,34,56,0.35); z-index: 40;
@@ -152,6 +200,61 @@
   #identityBar { display: flex; align-items: center; gap: 14px; font-size: 12px; color: #b9c6d6; }
   #identityBar button { background: none; border: 1px solid #39597d; color: #dbe6f0; font-size: 12px; cursor: pointer; padding: 5px 11px; border-radius: 4px; }
   #identityBar button:hover { background: rgba(255,255,255,0.08); }
+
+  /* ---------- onglets ---------- */
+  .tabbar { display: flex; gap: 4px; background: var(--navy-dark); padding: 0 24px; }
+  .tabbtn {
+    background: none; border: none; color: #a9bdd3; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    padding: 11px 16px; border-bottom: 3px solid transparent; font-family: inherit; letter-spacing: 0.01em;
+  }
+  .tabbtn:hover { color: #eef1f5; }
+  .tabbtn.active { color: #ffffff; border-bottom-color: var(--accent); }
+  .tabpanel { display: none; }
+  .tabpanel.active { display: block; }
+
+  /* ---------- onglet recherche ---------- */
+  .search-bar {
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px 18px; display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;
+  }
+  .search-field label { display: block; font-size: 11.5px; font-weight: 600; color: var(--sub); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .search-field input, .search-field select {
+    padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px; font-size: 13.5px; font-family: inherit; color: var(--ink);
+  }
+  .search-bar button {
+    padding: 9px 18px; border: none; border-radius: 4px; background: var(--navy); color: #fff;
+    font-size: 13.5px; font-weight: 600; cursor: pointer; letter-spacing: 0.01em;
+  }
+  .search-bar button:hover { background: var(--navy-dark); }
+  .search-bar .search-hint { font-size: 12px; color: var(--sub); flex-basis: 100%; }
+  .search-results-count { font-size: 12.5px; color: var(--sub); margin-bottom: 10px; }
+  table.search-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  table.search-table th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--sub);
+    background: var(--bg); padding: 9px 12px; border-bottom: 1px solid var(--border);
+  }
+  table.search-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.search-table tr:last-child td { border-bottom: none; }
+  table.search-table .src-tag {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 6px; border-radius: 3px;
+    background: var(--none-bg); color: var(--none-fg); display: inline-block;
+  }
+  table.search-table .src-tag.live { background: var(--ok-bg); color: var(--ok-fg); }
+
+  /* ---------- onglet repos en cours ---------- */
+  .rest-group-title { font-size: 12.5px; font-weight: 700; color: var(--navy); margin: 22px 0 10px; }
+  .rest-group-title:first-child { margin-top: 0; }
+  .rest-list { display: flex; flex-direction: column; gap: 8px; }
+  .rest-item {
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--ok-bar);
+    border-radius: 5px; padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .rest-item.active-work { border-left-color: var(--crit-bar); }
+  .rest-item-unit { font-weight: 700; color: var(--navy); font-size: 14.5px; }
+  .rest-item-sector { font-size: 12px; color: var(--sub); margin-left: 8px; }
+  .rest-item-duration { font-size: 17px; font-weight: 700; color: var(--ok-fg); font-variant-numeric: tabular-nums; }
+  .rest-item.active-work .rest-item-duration { color: var(--crit-fg); font-size: 13px; font-weight: 600; }
+  .rest-item-sub { font-size: 11.5px; color: var(--sub); }
 </style>
 </head>
 <body>
@@ -178,15 +281,60 @@
       <button id="logoutBtn" type="button">Déconnexion</button>
     </div>
   </div>
+  <div class="tabbar">
+    <button class="tabbtn active" id="tabBtnLive" type="button">Véhicules en faction</button>
+    <button class="tabbtn" id="tabBtnRest" type="button">Repos en cours</button>
+    <button class="tabbtn" id="tabBtnDaily" type="button">Compilation du jour</button>
+    <button class="tabbtn" id="tabBtnSearch" type="button">Recherche d'activités</button>
+  </div>
   <div class="wrap">
-    <p class="section-label">Véhicules en faction</p>
-    <div id="grid" class="grid"></div>
-    <div class="legend">
-      <span><i style="background:var(--ok-bar)"></i>Sous les seuils</span>
-      <span><i style="background:var(--watch-bar)"></i>À surveiller</span>
-      <span><i style="background:var(--soon-bar)"></i>Admissible (optionnel)</span>
-      <span><i style="background:var(--crit-bar)"></i>Obligatoire</span>
-      <span><i style="background:var(--none-bar)"></i>Aucune donnée récente</span>
+    <div class="tabpanel active" id="tabPanelLive">
+      <div id="statsRow" class="stats-row"></div>
+      <p class="section-label"><span class="live-dot" id="liveDot"></span>Véhicules en faction — mis à jour en direct</p>
+      <div id="grid"></div>
+      <div class="legend">
+        <span><i style="background:var(--ok-bar)"></i>Sous les seuils</span>
+        <span><i style="background:var(--watch-bar)"></i>À surveiller</span>
+        <span><i style="background:var(--soon-bar)"></i>Admissible (optionnel)</span>
+        <span><i style="background:var(--crit-bar)"></i>Obligatoire</span>
+        <span><i style="background:var(--none-bar)"></i>Aucune donnée récente</span>
+      </div>
+    </div>
+    <div class="tabpanel" id="tabPanelRest">
+      <p class="section-label"><span class="live-dot" id="liveDotRest"></span>Qui est en repos, et depuis combien de temps</p>
+      <div id="restWrap"></div>
+    </div>
+    <div class="tabpanel" id="tabPanelDaily">
+      <p class="section-label">Compilation des appels — déroulement d'une journée</p>
+      <div class="search-bar">
+        <div class="search-field">
+          <label for="dailyDate">Journée du</label>
+          <input type="date" id="dailyDate">
+        </div>
+        <button id="dailyBtn" type="button">Afficher</button>
+        <div class="search-hint" id="dailyHint"></div>
+      </div>
+      <div id="dailyResultsWrap"></div>
+    </div>
+    <div class="tabpanel" id="tabPanelSearch">
+      <p class="section-label">Recherche d'activités</p>
+      <div class="search-bar">
+        <div class="search-field">
+          <label for="searchUnit">Véhicule</label>
+          <select id="searchUnit"><option value="">Tous les véhicules</option></select>
+        </div>
+        <div class="search-field">
+          <label for="searchDateFrom">Du</label>
+          <input type="date" id="searchDateFrom">
+        </div>
+        <div class="search-field">
+          <label for="searchDateTo">Au</label>
+          <input type="date" id="searchDateTo">
+        </div>
+        <button id="searchBtn" type="button">Rechercher</button>
+        <div class="search-hint" id="searchHint"></div>
+      </div>
+      <div id="searchResultsWrap"></div>
     </div>
   </div>
 </div>
@@ -237,6 +385,9 @@
 
   // Combien de temps avant qu'une fiche véhicule soit considérée "ancienne"
   var STALE_AFTER_MIN = 45;
+
+  // Liste des véhicules connus (doit rester alignée avec KNOWN_UNIT_IDS dans index.html).
+  var KNOWN_UNIT_IDS = ["3706", "3707", "3711", "3696", "3672"];
 
   // =====================================================================
 
@@ -289,12 +440,29 @@
     $("dashboardScreen").style.display = "block";
     $("topTitle").textContent = "Suivi en direct — " + session.label;
     $("identityLabel").textContent = session.label;
+    populateSearchUnitSelect();
     if (initFirebase()) {
       listenToVehicles();
     } else {
       $("grid").innerHTML = '<div class="empty-state">Synchronisation non configurée.</div>';
     }
   }
+
+  // ---------- onglets ----------
+  var TABS = ["live", "rest", "daily", "search"];
+  $("tabBtnLive").addEventListener("click", function () { switchTab("live"); });
+  $("tabBtnRest").addEventListener("click", function () { switchTab("rest"); });
+  $("tabBtnDaily").addEventListener("click", function () { switchTab("daily"); });
+  $("tabBtnSearch").addEventListener("click", function () { switchTab("search"); });
+
+  function switchTab(tab) {
+    TABS.forEach(function (t) {
+      $("tabBtn" + capitalize(t)).classList.toggle("active", t === tab);
+      $("tabPanel" + capitalize(t)).classList.toggle("active", t === tab);
+    });
+    if (tab === "rest") renderRestTab();
+  }
+  function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
   function listenToVehicles() {
     db.collection("vehicules").onSnapshot(function (snap) {
@@ -329,35 +497,109 @@
   }
 
   var STATE_LABEL = { ok: "Sous les seuils", watch: "À surveiller", soon: "Admissible", crit: "Obligatoire", none: "Aucune donnée" };
+  var STAT_ORDER = ["crit", "soon", "watch", "ok", "none"];
+  var STAT_TILE_LABEL = { crit: "Obligatoire", soon: "Admissible", watch: "À surveiller", ok: "Sous les seuils", none: "Sans donnée" };
 
-  function renderGrid() {
-    var ids = Object.keys(vehicleDocs).sort();
-    var grid = $("grid");
-    if (!ids.length) {
-      grid.innerHTML = '<div class="empty-state">Aucun véhicule n\'a encore transmis de données.<br>Les fiches apparaîtront ici dès qu\'un TAP commence à remplir le PRO-3001 sur son téléphone.</div>';
-      return;
-    }
-    grid.innerHTML = "";
+  // Classe de couleur d'une barre de seuil, selon le temps cumulé continu (en
+  // minutes) et le palier pertinent (16h art. 4.4 ou 24h art. 4.5), avec les
+  // mêmes seuils "à surveiller / admissible / obligatoire" que l'application TAP.
+  function thrClass(mins, watchAt, soonAt, critAt) {
+    if (mins === null || mins === undefined) return "";
+    if (mins >= critAt) return "crit";
+    if (mins >= soonAt) return "soon";
+    if (mins >= watchAt) return "watch";
+    return "";
+  }
+
+  function lastActivity(acts) {
+    if (!acts || !acts.length) return null;
+    return acts[acts.length - 1];
+  }
+
+  function renderStats(ids) {
+    var counts = { ok: 0, watch: 0, soon: 0, crit: 0, none: 0 };
     ids.forEach(function (id) {
-      var v = vehicleDocs[id];
-      var result = v.result || {};
-      var state = result.state || "none";
-      var stale = isStale(v.lastUpdated);
-      var card = document.createElement("div");
-      card.className = "vcard " + state + (stale ? " stale" : "");
-      card.innerHTML =
-        '<div class="vcard-bar"></div>' +
+      var state = (vehicleDocs[id].result || {}).state || "none";
+      counts[state] = (counts[state] || 0) + 1;
+    });
+    var html = "";
+    STAT_ORDER.forEach(function (state) {
+      html += '<div class="stat-tile ' + state + '">' +
+        '<div class="stat-tile-count">' + counts[state] + '</div>' +
+        '<div class="stat-tile-label">' + STAT_TILE_LABEL[state] + '</div>' +
+      '</div>';
+    });
+    $("statsRow").innerHTML = html;
+  }
+
+  function vcardHtml(id, v) {
+    var result = v.result || {};
+    var state = result.state || "none";
+    var stale = isStale(v.lastUpdated);
+    var totalContinu4 = result.totalContinu4;
+    var totalContinu8 = result.totalContinu8;
+    var pct4 = totalContinu4 ? Math.min(100, (totalContinu4 / (16 * 60)) * 100) : 0;
+    var pct8 = totalContinu8 ? Math.min(100, (totalContinu8 / (24 * 60)) * 100) : 0;
+    var cls4 = thrClass(totalContinu4, 10 * 60, 12 * 60, 16 * 60);
+    var cls8 = thrClass(totalContinu8, 14 * 60, 17 * 60, 24 * 60);
+    var last = lastActivity(v.activities);
+
+    return '<div class="vcard-bar"></div>' +
         '<div class="vcard-body">' +
           '<div class="vcard-head"><div class="vcard-unit" data-unit="' + escapeHtml(id) + '" tabindex="0">' + escapeHtml(id) + '</div><div class="vcard-sector">' + escapeHtml(v.sector || "") + '</div></div>' +
           '<div class="vcard-status ' + state + '">' + STATE_LABEL[state] + (stale ? " · info ancienne" : "") + '</div>' +
           '<div class="vcard-msg">' + escapeHtml(result.msg || "—") + '</div>' +
           '<div class="vcard-meta"><span>Cumul : ' + fmtHM(result.totalContinu) + '</span><span>Repos en cours : ' + fmtHM(result.restSinceLast) + '</span></div>' +
+          (result.totalContinu4 !== undefined ? (
+          '<div class="thresholds">' +
+            '<div class="thr-row"><div class="thr-label"><span>Règle du 16 h (art. 4.4)</span><span>' + fmtHM(totalContinu4) + ' / 16h</span></div>' +
+              '<div class="thr-track"><div class="thr-fill ' + cls4 + '" style="width:' + pct4.toFixed(0) + '%;"></div></div></div>' +
+            '<div class="thr-row"><div class="thr-label"><span>Règle du 24 h (art. 4.5)</span><span>' + fmtHM(totalContinu8) + ' / 24h</span></div>' +
+              '<div class="thr-track"><div class="thr-fill ' + cls8 + '" style="width:' + pct8.toFixed(0) + '%;"></div></div></div>' +
+          '</div>') : '') +
+          (last ? '<div class="vcard-lastact">Dernière activité : <b>' + escapeHtml(last.startDate || "") + ' ' + escapeHtml(last.start || "") + '</b>' +
+            (last.description ? ' — <span class="act-desc">' + escapeHtml(last.description) + '</span>' : '') + '</div>' : '') +
           '<div class="vcard-updated">Mis à jour il y a ' + timeAgo(v.lastUpdated) +
             (session.role === "direction" && v.enteredBy ? ' · saisi par ' + escapeHtml(v.enteredBy.name) + ' (' + escapeHtml(v.enteredBy.matricule) + ')' : '') + '</div>' +
           '<div class="vcard-detail-link" data-unit="' + escapeHtml(id) + '">Voir les activités' + (session.role === "direction" ? " et l'historique" : "") + ' →</div>' +
         '</div>';
-      grid.appendChild(card);
+  }
+
+  function renderGrid() {
+    var ids = Object.keys(vehicleDocs).sort();
+    var grid = $("grid");
+    if (!ids.length) {
+      $("statsRow").innerHTML = "";
+      grid.innerHTML = '<div class="empty-state">Aucun véhicule n\'a encore transmis de données.<br>Les fiches apparaîtront ici dès qu\'un TAP commence à remplir le PRO-3001 sur son téléphone.</div>';
+      return;
+    }
+    renderStats(ids);
+
+    // Regroupement par secteur (ordre : secteurs connus par ordre d'apparition, puis "Secteur non précisé").
+    var sectors = [];
+    var bySector = {};
+    ids.forEach(function (id) {
+      var sector = vehicleDocs[id].sector || "Secteur non précisé";
+      if (!bySector[sector]) { bySector[sector] = []; sectors.push(sector); }
+      bySector[sector].push(id);
     });
+
+    var html = "";
+    sectors.forEach(function (sector) {
+      var sectorIds = bySector[sector];
+      html += '<div class="sector-heading">' + escapeHtml(sector) + ' <span class="sector-heading-count">(' + sectorIds.length + ' véhicule' + (sectorIds.length > 1 ? "s" : "") + ')</span></div>';
+      html += '<div class="grid">';
+      sectorIds.forEach(function (id) {
+        var v = vehicleDocs[id];
+        var result = v.result || {};
+        var state = result.state || "none";
+        var stale = isStale(v.lastUpdated);
+        html += '<div class="vcard ' + state + (stale ? " stale" : "") + '">' + vcardHtml(id, v) + '</div>';
+      });
+      html += '</div>';
+    });
+    grid.innerHTML = html;
+
     grid.querySelectorAll(".vcard-unit, .vcard-detail-link").forEach(function (el) {
       el.addEventListener("click", function () { openDetail(el.getAttribute("data-unit")); });
     });
@@ -390,7 +632,8 @@
     } else {
       acts.forEach(function (a, i) {
         html += '<div class="act-row">#' + (i + 1) + ' — ' + escapeHtml(a.startDate) + ' ' + escapeHtml(a.start) +
-          ' → ' + escapeHtml(a.activityEndDate || a.callEndDate || "") + ' ' + escapeHtml(a.activityEnd || a.callEnd || "") + '</div>';
+          ' → ' + escapeHtml(a.activityEndDate || a.callEndDate || "") + ' ' + escapeHtml(a.activityEnd || a.callEnd || "") +
+          (a.description ? '<br><span class="act-desc">' + escapeHtml(a.description) + '</span>' : '') + '</div>';
       });
     }
     if (session.role === "direction") {
@@ -414,8 +657,13 @@
         snap.forEach(function (doc) {
           var h = doc.data();
           var res = h.result || {};
+          var acts = h.activities || [];
+          var descs = acts.filter(function (a) { return a.description; })
+            .map(function (a) { return escapeHtml(a.startDate) + ' ' + escapeHtml(a.start) + ' — ' + escapeHtml(a.description); });
           html += '<div class="hist-item"><b>' + escapeHtml(h.factionStartDate || "") + ' ' + escapeHtml(h.factionStart || "") + '</b><br>' +
-            escapeHtml(res.msg || "—") + ' — cumul ' + fmtHM(res.totalContinu) + '<br>' +
+            escapeHtml(res.msg || "—") + ' — cumul ' + fmtHM(res.totalContinu) +
+            (res.totalContinu4 !== undefined ? ' (16h : ' + fmtHM(res.totalContinu4) + ' · 24h : ' + fmtHM(res.totalContinu8) + ')' : '') + '<br>' +
+            (descs.length ? '<span class="act-desc">' + descs.join("<br>") + '</span><br>' : '') +
             '<span style="color:var(--sub);">Archivé le ' + escapeHtml((h.savedAt || "").slice(0, 16).replace("T", " à ")) +
             (h.enteredBy ? ' · saisi par ' + escapeHtml(h.enteredBy.name) + ' (' + escapeHtml(h.enteredBy.matricule) + ')' : '') + '</span></div>';
         });
@@ -425,6 +673,258 @@
         target.innerHTML = "Erreur de chargement de l'historique.";
         console.error(e);
       });
+  }
+
+  // ---------- onglet repos en cours ----------
+  function tsToMillis(ts) {
+    if (!ts) return null;
+    return ts.toMillis ? ts.toMillis() : new Date(ts).getTime();
+  }
+
+  function renderRestTab() {
+    var ids = Object.keys(vehicleDocs).sort();
+    var wrap = $("restWrap");
+    if (!ids.length) {
+      wrap.innerHTML = '<div class="empty-state">Aucun véhicule n\'a encore transmis de données.</div>';
+      return;
+    }
+
+    var resting = [];
+    var working = [];
+    ids.forEach(function (id) {
+      var v = vehicleDocs[id];
+      var result = v.result || {};
+      var lastUpdatedMs = tsToMillis(v.lastUpdated);
+      var restMin = result.restSinceLast;
+      if (restMin && restMin > 0 && lastUpdatedMs) {
+        var restStartedAtMs = lastUpdatedMs - restMin * 60000;
+        var liveMin = (Date.now() - restStartedAtMs) / 60000;
+        resting.push({ id: id, sector: v.sector, liveMin: liveMin, stale: isStale(v.lastUpdated) });
+      } else {
+        working.push({ id: id, sector: v.sector, msg: result.msg || "—", state: result.state || "none" });
+      }
+    });
+    resting.sort(function (a, b) { return b.liveMin - a.liveMin; });
+
+    var html = "";
+    html += '<div class="rest-group-title">En repos actuellement (' + resting.length + ')</div>';
+    if (!resting.length) {
+      html += '<p style="font-size:13px;color:var(--sub);">Aucun véhicule en repos en ce moment.</p>';
+    } else {
+      html += '<div class="rest-list">';
+      resting.forEach(function (r) {
+        html += '<div class="rest-item">' +
+          '<div><span class="rest-item-unit">' + escapeHtml(r.id) + '</span><span class="rest-item-sector">' + escapeHtml(r.sector || "") + '</span>' +
+          (r.stale ? '<div class="rest-item-sub">Donnée possiblement ancienne — non confirmée depuis un moment</div>' : '') + '</div>' +
+          '<div class="rest-item-duration">' + fmtHM(r.liveMin) + ' de repos</div>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="rest-group-title">Actuellement au travail / en appel (' + working.length + ')</div>';
+    if (!working.length) {
+      html += '<p style="font-size:13px;color:var(--sub);">Tous les véhicules sont en repos.</p>';
+    } else {
+      html += '<div class="rest-list">';
+      working.forEach(function (w) {
+        html += '<div class="rest-item active-work">' +
+          '<div><span class="rest-item-unit">' + escapeHtml(w.id) + '</span><span class="rest-item-sector">' + escapeHtml(w.sector || "") + '</span></div>' +
+          '<div class="rest-item-duration">' + escapeHtml(STATE_LABEL[w.state] || w.msg) + '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+    wrap.innerHTML = html;
+  }
+
+  // Rafraîchit le compteur de repos en direct (toutes les 30 s) tant que l'onglet est affiché.
+  setInterval(function () {
+    if (session && $("tabPanelRest").classList.contains("active")) renderRestTab();
+  }, 30000);
+
+  // ---------- onglet compilation du jour ----------
+  $("dailyBtn").addEventListener("click", runDailyCompilation);
+
+  function runDailyCompilation() {
+    var date = $("dailyDate").value;
+    if (!date) { $("dailyResultsWrap").innerHTML = '<p style="font-size:13px;color:var(--sub);">Choisissez une date.</p>'; return; }
+    var targetIds = Object.keys(vehicleDocs).concat(KNOWN_UNIT_IDS).filter(function (id, i, arr) { return arr.indexOf(id) === i; });
+    var results = [];
+
+    targetIds.forEach(function (id) {
+      var v = vehicleDocs[id];
+      if (!v || !v.activities) return;
+      v.activities.forEach(function (a) {
+        if (activityInRange(a, date, date)) {
+          results.push({ unitId: id, sector: v.sector, source: "live", activity: a, enteredBy: v.enteredBy });
+        }
+      });
+    });
+
+    var histPromise = Promise.resolve();
+    if (session.role === "direction" && db) {
+      histPromise = Promise.all(targetIds.map(function (id) {
+        return db.collection("vehicules").doc(id).collection("historique").limit(200).get()
+          .then(function (snap) {
+            snap.forEach(function (doc) {
+              var h = doc.data();
+              (h.activities || []).forEach(function (a) {
+                if (activityInRange(a, date, date)) {
+                  results.push({ unitId: id, sector: h.sector, source: "archive", activity: a, enteredBy: h.enteredBy });
+                }
+              });
+            });
+          })
+          .catch(function (e) { console.warn("Compilation échouée pour " + id + " :", e); });
+      }));
+    }
+
+    histPromise.then(function () { renderDailyResults(results, date); });
+  }
+
+  function renderDailyResults(results, date) {
+    // Ordre chronologique (du matin vers le soir), à l'inverse de l'onglet recherche.
+    results.sort(function (a, b) {
+      var ka = (a.activity.start || "");
+      var kb = (b.activity.start || "");
+      return ka.localeCompare(kb);
+    });
+
+    var wrap = $("dailyResultsWrap");
+    if (!results.length) {
+      wrap.innerHTML = '<div class="empty-state">Aucun appel ou activité consigné pour le ' + escapeHtml(date) + '.</div>';
+      return;
+    }
+    var showEnteredBy = session.role === "direction";
+    var html = '<div class="search-results-count">' + results.length + ' activité' + (results.length > 1 ? "s" : "") + ' le ' + escapeHtml(date) + '</div>';
+    html += '<table class="search-table"><thead><tr>' +
+      '<th>Heure</th><th>Véhicule</th><th>Secteur</th><th>Fin</th><th>Référence</th>' +
+      (showEnteredBy ? '<th>Saisi par</th>' : '') +
+      '</tr></thead><tbody>';
+    results.forEach(function (r) {
+      var a = r.activity;
+      html += '<tr>' +
+        '<td><b>' + escapeHtml(a.start || "") + '</b></td>' +
+        '<td>' + escapeHtml(r.unitId) + '</td>' +
+        '<td>' + escapeHtml(r.sector || "—") + '</td>' +
+        '<td>' + escapeHtml(a.activityEndDate || a.callEndDate || "") + ' ' + escapeHtml(a.activityEnd || a.callEnd || "") + '</td>' +
+        '<td>' + (a.description ? escapeHtml(a.description) : '<span style="color:var(--sub);">—</span>') + '</td>' +
+        (showEnteredBy ? '<td>' + (r.enteredBy ? escapeHtml(r.enteredBy.name) + ' (' + escapeHtml(r.enteredBy.matricule) + ')' : '—') + '</td>' : '') +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  // ---------- onglet recherche d'activités ----------
+  function populateSearchUnitSelect() {
+    var sel = $("searchUnit");
+    while (sel.options.length > 1) sel.remove(1);
+    KNOWN_UNIT_IDS.forEach(function (id) {
+      var opt = document.createElement("option");
+      opt.value = id; opt.textContent = id;
+      sel.appendChild(opt);
+    });
+    var limitedMsg = session && session.role === "repartiteurs";
+    $("searchHint").textContent = limitedMsg
+      ? "Recherche limitée aux quarts en cours (l'historique archivé n'est visible que pour la direction)."
+      : "Recherche parmi les quarts en cours et les quarts archivés de tous les véhicules.";
+    $("dailyHint").textContent = limitedMsg
+      ? "Compilation limitée aux quarts en cours."
+      : "Compilation des quarts en cours et archivés.";
+    if (!$("dailyDate").value) {
+      var d = new Date();
+      $("dailyDate").value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    }
+  }
+
+  $("searchBtn").addEventListener("click", runSearch);
+
+  function activityInRange(a, from, to) {
+    var d = a.startDate || "";
+    if (!d) return !from && !to; // activité sans date : on l'inclut seulement si aucun filtre de date
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  }
+
+  function runSearch() {
+    var unitFilter = $("searchUnit").value;
+    var from = $("searchDateFrom").value;
+    var to = $("searchDateTo").value;
+    var targetIds = unitFilter ? [unitFilter] : Object.keys(vehicleDocs).concat(KNOWN_UNIT_IDS).filter(function (id, i, arr) { return arr.indexOf(id) === i; });
+
+    $("searchResultsWrap").innerHTML = '<p style="font-size:13px;color:var(--sub);">Recherche en cours…</p>';
+
+    var results = [];
+
+    // 1) quarts en cours (déjà en mémoire, pas besoin de requête)
+    targetIds.forEach(function (id) {
+      var v = vehicleDocs[id];
+      if (!v || !v.activities) return;
+      v.activities.forEach(function (a) {
+        if (activityInRange(a, from, to)) {
+          results.push({ unitId: id, sector: v.sector, source: "live", activity: a, shiftDate: v.factionStartDate, shiftStart: v.factionStart, enteredBy: v.enteredBy });
+        }
+      });
+    });
+
+    // 2) quarts archivés (direction seulement — les répartiteurs n'ont pas accès à l'historique)
+    var histPromise = Promise.resolve();
+    if (session.role === "direction" && db) {
+      histPromise = Promise.all(targetIds.map(function (id) {
+        return db.collection("vehicules").doc(id).collection("historique").limit(200).get()
+          .then(function (snap) {
+            snap.forEach(function (doc) {
+              var h = doc.data();
+              (h.activities || []).forEach(function (a) {
+                if (activityInRange(a, from, to)) {
+                  results.push({ unitId: id, sector: h.sector, source: "archive", activity: a, shiftDate: h.factionStartDate, shiftStart: h.factionStart, savedAt: h.savedAt, enteredBy: h.enteredBy });
+                }
+              });
+            });
+          })
+          .catch(function (e) { console.warn("Recherche archivée échouée pour " + id + " :", e); });
+      }));
+    }
+
+    histPromise.then(function () { renderSearchResults(results); });
+  }
+
+  function renderSearchResults(results) {
+    results.sort(function (a, b) {
+      var ka = (a.activity.startDate || "") + " " + (a.activity.start || "");
+      var kb = (b.activity.startDate || "") + " " + (b.activity.start || "");
+      return kb.localeCompare(ka);
+    });
+
+    var wrap = $("searchResultsWrap");
+    if (!results.length) {
+      wrap.innerHTML = '<div class="empty-state">Aucune activité trouvée pour ces critères.</div>';
+      return;
+    }
+
+    var showEnteredBy = session.role === "direction";
+    var html = '<div class="search-results-count">' + results.length + ' activité' + (results.length > 1 ? "s" : "") + ' trouvée' + (results.length > 1 ? "s" : "") + '</div>';
+    html += '<table class="search-table"><thead><tr>' +
+      '<th>Véhicule</th><th>Secteur</th><th>Début</th><th>Fin</th><th>Référence</th><th>Quart</th>' +
+      (showEnteredBy ? '<th>Saisi par</th>' : '') +
+      '</tr></thead><tbody>';
+    results.forEach(function (r) {
+      var a = r.activity;
+      html += '<tr>' +
+        '<td><b>' + escapeHtml(r.unitId) + '</b></td>' +
+        '<td>' + escapeHtml(r.sector || "—") + '</td>' +
+        '<td>' + escapeHtml(a.startDate || "") + ' ' + escapeHtml(a.start || "") + '</td>' +
+        '<td>' + escapeHtml(a.activityEndDate || a.callEndDate || "") + ' ' + escapeHtml(a.activityEnd || a.callEnd || "") + '</td>' +
+        '<td>' + (a.description ? escapeHtml(a.description) : '<span style="color:var(--sub);">—</span>') + '</td>' +
+        '<td><span class="src-tag ' + r.source + '">' + (r.source === "live" ? "En cours" : "Archivé") + '</span></td>' +
+        (showEnteredBy ? '<td>' + (r.enteredBy ? escapeHtml(r.enteredBy.name) + ' (' + escapeHtml(r.enteredBy.matricule) + ')' : '—') + '</td>' : '') +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
   }
 
   // ---------- reprise de session ----------
